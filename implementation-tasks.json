@@ -1,0 +1,383 @@
+{
+  "project": "stageinseconds.com",
+  "title": "Production Readiness Implementation Tasks",
+  "lastUpdated": "2025-11-09",
+  "estimatedTotalTime": "3-4 weeks",
+  "overview": {
+    "description": "Comprehensive task list to make the application production-ready. Follow tasks sequentially, one at a time.",
+    "successCriteria": [
+      "All tests pass with 70%+ coverage",
+      "ESLint and Prettier configured with pre-commit hooks",
+      "Database migrations working",
+      "CI/CD pipeline green on GitHub Actions",
+      "Error tracking configured (Sentry)",
+      "Rate limiting active on API endpoints",
+      "Request validation using Zod schemas",
+      "No high/critical security vulnerabilities",
+      "Build succeeds without errors",
+      "Documentation updated and accurate"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "task-1",
+      "priority": 1,
+      "title": "Add ESLint and Prettier",
+      "estimatedTime": "30 minutes",
+      "week": 1,
+      "location": "apps/web/",
+      "prompt": "I need to add ESLint and Prettier to this project to enforce code quality and consistent formatting.\n\nRequirements:\n1. Install ESLint with TypeScript support for the web app\n2. Install Prettier for code formatting\n3. Create .eslintrc.js with these rules:\n   - Extend recommended TypeScript and React rules\n   - No unused variables (error)\n   - No console.log in production (warn)\n   - Prefer const over let (warn)\n4. Create .prettierrc with:\n   - Semi: false\n   - Single quotes: true\n   - Tab width: 2\n   - Trailing comma: es5\n5. Create .eslintignore and .prettierignore files\n6. Install husky and lint-staged for pre-commit hooks\n7. Configure git hooks to:\n   - Run prettier on staged files\n   - Run eslint on staged files\n   - Block commit if linting fails\n8. Add npm scripts to package.json:\n   - \"lint\": run eslint on all files\n   - \"lint:fix\": run eslint with --fix\n   - \"format\": run prettier on all files\n   - \"format:check\": check if files are formatted\n9. Fix any existing linting errors in the codebase\n\nLocation: apps/web/\n\nDo NOT change any business logic, only add linting/formatting configuration.",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run lint",
+          "npm run format:check",
+          "git add .",
+          "git commit -m \"test\" # Should trigger pre-commit hooks"
+        ],
+        "expectedOutcome": "All commands pass, pre-commit hooks run successfully"
+      },
+      "deliverables": [
+        ".eslintrc.js",
+        ".prettierrc",
+        ".eslintignore",
+        ".prettierignore",
+        ".husky/pre-commit",
+        "package.json (updated scripts)"
+      ]
+    },
+    {
+      "id": "task-2",
+      "priority": 1,
+      "title": "Create Database Migrations",
+      "estimatedTime": "1 hour",
+      "week": 1,
+      "location": "apps/web/",
+      "prompt": "I need to set up database migrations using Drizzle ORM for this project.\n\nCurrent state:\n- Using Neon PostgreSQL with @neondatabase/serverless\n- Manual schema management (no migrations)\n- Database schema documented in DATABASE_SCHEMA.md\n\nRequirements:\n1. Install Drizzle ORM and drizzle-kit:\n   - drizzle-orm\n   - drizzle-kit\n   - @neondatabase/serverless (already installed)\n\n2. Create drizzle.config.ts in apps/web/ with:\n   - Connection to DATABASE_URL\n   - Schema path: src/db/schema.ts\n   - Migrations folder: migrations/\n   - Driver: neon-serverless\n\n3. Create src/db/schema.ts with ALL tables from DATABASE_SCHEMA.md:\n   - auth_users (with UUID id, email, name, emailVerified, image, timestamps)\n   - auth_accounts (with userId foreign key, provider, type, providerAccountId, password, tokens, timestamps)\n   - auth_sessions (with userId foreign key, sessionToken, expires, timestamps)\n   - auth_verification_token (with identifier, token, expires)\n   - photo_jobs (with user_id foreign key, prompt, photo_count, cost, status, download_url, group_name, timestamps)\n   - user_credits (with user_id foreign key unique, credits, free_used, timestamps)\n   - purchases (with user_id foreign key, stripe_session_id unique, amount, credits_purchased, status, timestamps)\n\n4. Generate initial migration:\n   - Run: npx drizzle-kit generate:pg\n\n5. Create migration runner at src/db/migrate.ts:\n   - Reads DATABASE_URL from process.env\n   - Runs migrations using drizzle-kit migrate\n   - Logs migration status\n\n6. Update package.json scripts:\n   - \"db:generate\": \"drizzle-kit generate:pg\"\n   - \"db:migrate\": \"tsx src/db/migrate.ts\"\n   - \"db:studio\": \"drizzle-kit studio\"\n   - \"db:push\": \"drizzle-kit push:pg\"\n\n7. Update existing code to use Drizzle:\n   - Replace raw SQL in src/app/api/utils/sql.js with Drizzle queries where possible\n   - Keep backward compatibility (don't break existing code)\n   - Add Drizzle client export in src/db/index.ts\n\n8. Add README section documenting:\n   - How to generate migrations\n   - How to run migrations\n   - How to rollback migrations\n\nIMPORTANT: Use the EXACT schema from DATABASE_SCHEMA.md - match all column names, types, constraints, and indexes.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run db:generate",
+          "npm run db:migrate",
+          "npm run db:studio"
+        ],
+        "expectedOutcome": "Migrations generate and run successfully, Drizzle Studio opens"
+      },
+      "deliverables": [
+        "drizzle.config.ts",
+        "src/db/schema.ts",
+        "src/db/migrate.ts",
+        "src/db/index.ts",
+        "migrations/*.sql",
+        "package.json (updated scripts)",
+        "README.md (updated)"
+      ]
+    },
+    {
+      "id": "task-3",
+      "priority": 1,
+      "title": "Write Unit Tests",
+      "estimatedTime": "2-3 hours",
+      "week": 1,
+      "location": "apps/web/",
+      "prompt": "I need comprehensive unit tests for utility functions and business logic.\n\nCurrent state:\n- Vitest configured but ZERO test files\n- No test coverage\n\nRequirements:\n\n1. Create test files for authentication logic:\n   File: test/auth/password.test.ts\n   - Test password hashing with argon2\n   - Test password verification (correct password)\n   - Test password verification (incorrect password)\n   - Test that passwords are never stored in plain text\n\n2. Create test files for input validation:\n   File: test/utils/validation.test.ts\n   - Test URL validation (HTTPS only, no localhost, no private IPs)\n   - Test file URL array validation (1-30 files)\n   - Test prompt validation (non-empty string)\n   - Test group name validation (max 140 chars)\n   - Test email validation\n   - Test job ID validation (must be integer)\n\n3. Create test files for SSRF protection:\n   File: test/security/ssrf.test.ts\n   - Test blocking HTTP URLs (only HTTPS allowed)\n   - Test blocking localhost (localhost, 127.0.0.1, 0.0.0.0)\n   - Test blocking private IPs (10.x.x.x, 192.168.x.x, 172.16-31.x.x)\n   - Test allowing valid HTTPS URLs\n   - Test blocking data: URIs\n   - Test blocking file:// URIs\n\n4. Extract validation logic from API routes into reusable functions:\n   File: src/utils/validators.ts\n   Functions to create:\n   - validateFileUrls(urls: string[]): void (throws if invalid)\n   - validatePrompt(prompt: string): void (throws if invalid)\n   - validateGroupName(name: string): void (throws if invalid)\n   - validateEmail(email: string): void (throws if invalid)\n   - isPrivateIP(hostname: string): boolean\n   - isSafeUrl(url: string): boolean\n\n5. Update API routes to use these validation functions:\n   - apps/web/src/app/api/process-photos/route.js (use validateFileUrls, validatePrompt)\n   - apps/web/src/app/api/jobs/[id]/route.js (use validateGroupName)\n\n6. Configure test coverage in vitest.config.ts:\n   - Require 80% coverage for src/utils/\n   - Require 100% coverage for src/utils/validators.ts\n   - Exclude test files, config files, and __create from coverage\n\n7. Add test npm scripts to package.json:\n   - \"test:unit\": run only unit tests\n   - \"test:coverage\": run with coverage report\n\nTest all edge cases and error conditions. Use descriptive test names.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:unit",
+          "npm run test:coverage"
+        ],
+        "expectedOutcome": "All unit tests pass, 80%+ coverage for utils"
+      },
+      "deliverables": [
+        "test/auth/password.test.ts",
+        "test/utils/validation.test.ts",
+        "test/security/ssrf.test.ts",
+        "src/utils/validators.ts",
+        "vitest.config.ts (updated)",
+        "package.json (updated scripts)"
+      ]
+    },
+    {
+      "id": "task-4-part-1",
+      "priority": 1,
+      "title": "Integration Tests - Infrastructure Setup",
+      "estimatedTime": "1 hour",
+      "week": 2,
+      "location": "apps/web/",
+      "prompt": "I need to set up integration testing infrastructure for API endpoints.\n\nRequirements:\n\n1. Create test database setup utilities:\n   File: test/helpers/db.ts\n   Functions:\n   - setupTestDb(): Promise<void> - Runs migrations on test database\n   - teardownTestDb(): Promise<void> - Cleans all tables\n   - createTestUser(email?: string): Promise<User> - Creates test user with hashed password\n   - createTestSession(userId: string): Promise<Session> - Creates valid session for user\n   - grantCredits(userId: string, amount: number): Promise<void> - Adds credits to user\n\n2. Create API testing utilities:\n   File: test/helpers/api.ts\n   Functions:\n   - makeRequest(path: string, options?: RequestInit): Promise<Response> - Fetch wrapper for API\n   - authenticatedRequest(sessionToken: string, path: string, options?: RequestInit): Promise<Response>\n\n3. Configure test environment:\n   - Add TEST_DATABASE_URL to .env.example\n   - Update vitest.config.ts to use TEST_DATABASE_URL\n   - Add setup/teardown hooks in test/setup.ts\n\n4. Install additional test dependencies:\n   - @testing-library/react (already installed)\n   - msw (Mock Service Worker) for mocking external APIs\n   - vitest-mock-extended\n   - supertest for HTTP assertions\n\n5. Create MSW handlers for external services:\n   File: test/mocks/handlers.ts\n   Mock handlers for:\n   - Google Gemini API (successful response)\n   - Stripe API (checkout session creation)\n   - File upload service (successful upload)\n\n6. Document test database setup in TESTING_STRATEGY.md:\n   - How to create test database\n   - How to run integration tests\n   - Environment variables needed\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:integration -- test/helpers"
+        ],
+        "expectedOutcome": "Test infrastructure works, helpers are functional"
+      },
+      "deliverables": [
+        "test/helpers/db.ts",
+        "test/helpers/api.ts",
+        "test/mocks/handlers.ts",
+        "test/setup.ts",
+        ".env.example (updated)",
+        "vitest.config.ts (updated)",
+        "package.json (dependencies updated)"
+      ]
+    },
+    {
+      "id": "task-4-part-2",
+      "priority": 1,
+      "title": "Integration Tests - Authentication",
+      "estimatedTime": "1 hour",
+      "week": 2,
+      "location": "apps/web/",
+      "prompt": "Now write integration tests for authentication endpoints.\n\nFile: test/api/auth.test.ts\n\nTest coverage needed:\n\n1. POST /api/auth/signup\n   - ✅ Should create new user with valid email/password\n   - ✅ Should hash password with argon2\n   - ✅ Should reject duplicate email addresses\n   - ✅ Should reject invalid email format\n   - ✅ Should reject missing email or password\n   - ✅ Should create user record in auth_users table\n   - ✅ Should create account record in auth_accounts table\n   - ✅ Should set session cookie on successful signup\n\n2. POST /api/auth/signin\n   - ✅ Should authenticate with correct email/password\n   - ✅ Should reject incorrect password\n   - ✅ Should reject non-existent email\n   - ✅ Should set session cookie on successful signin\n   - ✅ Should create session record in auth_sessions table\n\n3. POST /api/auth/signout\n   - ✅ Should clear session cookie\n   - ✅ Should delete session from database\n   - ✅ Should require authentication\n\nUse the test helpers from test/helpers/db.ts and test/helpers/api.ts.\nUse beforeEach to setup clean database state.\nUse afterEach to teardown test data.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:integration -- test/api/auth"
+        ],
+        "expectedOutcome": "All auth endpoint tests pass"
+      },
+      "deliverables": [
+        "test/api/auth.test.ts"
+      ]
+    },
+    {
+      "id": "task-4-part-3",
+      "priority": 1,
+      "title": "Integration Tests - Billing",
+      "estimatedTime": "2 hours",
+      "week": 2,
+      "location": "apps/web/",
+      "prompt": "Write integration tests for billing endpoints.\n\nFile: test/api/billing.test.ts\n\nTest coverage needed:\n\n1. GET /api/billing/products\n   - ✅ Should return pricing offers for unauthenticated users\n   - ✅ Should include all 4 pricing tiers (PAYG, 20-pack, 50-pack, 100-pack)\n   - ✅ Should include price metadata (credits_per_unit, type)\n\n2. POST /api/billing/create-checkout\n   - ✅ Should create Stripe checkout session for authenticated user\n   - ✅ Should reject unauthenticated requests (401)\n   - ✅ Should validate lookupKey exists\n   - ✅ Should verify price metadata app=\"stageinseconds\" (security check)\n   - ✅ Should include user email in Stripe session\n\n3. GET /api/billing/me\n   - ✅ Should return credits and free_used for authenticated user\n   - ✅ Should return 0 credits for new user\n   - ✅ Should return authenticated: false for unauthenticated requests\n\n4. POST /api/billing/stripe-webhook (CRITICAL - test thoroughly)\n   - ✅ Should add credits on checkout.session.completed event\n   - ✅ Should verify Stripe signature (mock this)\n   - ✅ Should validate metadata app=\"stageinseconds\"\n   - ✅ Should prevent duplicate credit grants (same stripe_session_id)\n   - ✅ Should record purchase in purchases table\n   - ✅ Should upsert user_credits (create if not exists, update if exists)\n   - ✅ Should handle webhook replay attacks\n\nMock Stripe API calls using MSW handlers.\nTest both success and failure scenarios.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:integration -- test/api/billing"
+        ],
+        "expectedOutcome": "All billing endpoint tests pass, especially webhook security tests"
+      },
+      "deliverables": [
+        "test/api/billing.test.ts"
+      ]
+    },
+    {
+      "id": "task-4-part-4",
+      "priority": 1,
+      "title": "Integration Tests - Photo Processing",
+      "estimatedTime": "2 hours",
+      "week": 3,
+      "location": "apps/web/",
+      "prompt": "Write integration tests for the photo processing endpoint - this is the MOST COMPLEX endpoint with 640 lines.\n\nFile: test/api/process-photos.test.ts\n\nTest coverage needed:\n\n1. Authentication\n   - ✅ Should reject unauthenticated requests (401)\n\n2. Input Validation - File URLs\n   - ✅ Should reject HTTP URLs (only HTTPS allowed)\n   - ✅ Should reject localhost URLs (SSRF protection)\n   - ✅ Should reject 127.0.0.1 URLs (SSRF protection)\n   - ✅ Should reject private IP addresses (10.x, 192.168.x, 172.16-31.x)\n   - ✅ Should reject more than 30 files (400)\n   - ✅ Should reject empty file array (400)\n   - ✅ Should reject non-array fileUrls (400)\n   - ✅ Should accept valid HTTPS URLs\n\n3. Input Validation - Prompt\n   - ✅ Should reject empty prompt\n   - ✅ Should reject missing prompt\n   - ✅ Should accept valid prompt string\n\n4. File Processing\n   - ✅ Should reject files larger than 15MB\n   - ✅ Should reject invalid content types (non-images)\n   - ✅ Should download and validate images\n\n5. Job Creation\n   - ✅ Should create job record in photo_jobs table\n   - ✅ Should set user_id to authenticated user\n   - ✅ Should set status to 'pending'\n   - ✅ Should record photo_count\n   - ✅ Should calculate cost\n\n6. AI Processing (mock Gemini API)\n   - ✅ Should call Google Gemini API with correct parameters\n   - ✅ Should handle Gemini API errors gracefully (502)\n   - ✅ Should update job status to 'completed' on success\n   - ✅ Should update job status to 'failed' on error\n\n7. Response\n   - ✅ Should return job ID\n   - ✅ Should return download URL\n   - ✅ Should return cost and photo count\n\nMock Google Gemini API using MSW.\nMock file downloads using MSW.\nTest both happy path and error scenarios.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:integration -- test/api/process-photos"
+        ],
+        "expectedOutcome": "All photo processing tests pass, including SSRF protection tests"
+      },
+      "deliverables": [
+        "test/api/process-photos.test.ts"
+      ]
+    },
+    {
+      "id": "task-4-part-5",
+      "priority": 1,
+      "title": "Integration Tests - Job Management",
+      "estimatedTime": "1 hour",
+      "week": 3,
+      "location": "apps/web/",
+      "prompt": "Write integration tests for job management endpoints.\n\nFile: test/api/jobs.test.ts\n\nTest coverage needed:\n\n1. GET /api/dashboard\n   - ✅ Should return user's jobs (last 50, ordered by created_at DESC)\n   - ✅ Should return stats (total_jobs, total_spent, this_month_spent)\n   - ✅ Should return credits balance\n   - ✅ Should only show jobs belonging to authenticated user\n   - ✅ Should require authentication (401)\n   - ✅ Should handle user with no jobs (empty array)\n\n2. GET /api/dashboard?id=123\n   - ✅ Should return single job by ID\n   - ✅ Should return 404 if job not found\n   - ✅ Should return 403 if job belongs to different user\n\n3. PATCH /api/jobs/[id]\n   - ✅ Should update group_name (max 140 chars)\n   - ✅ Should reject group_name > 140 chars (400)\n   - ✅ Should return 404 if job not found\n   - ✅ Should return 403 if job belongs to different user (CRITICAL security test)\n   - ✅ Should update updated_at timestamp\n   - ✅ Should require authentication (401)\n\n4. DELETE /api/jobs/[id]\n   - ✅ Should delete job\n   - ✅ Should return 404 if job not found\n   - ✅ Should return 403 if job belongs to different user (CRITICAL security test)\n   - ✅ Should require authentication (401)\n\nCreate test jobs with createTestJob() helper function.\nTest authorization checks thoroughly - users should NEVER access other users' jobs.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test:integration -- test/api/jobs"
+        ],
+        "expectedOutcome": "All job management tests pass, especially authorization tests"
+      },
+      "deliverables": [
+        "test/api/jobs.test.ts",
+        "test/helpers/db.ts (add createTestJob helper)"
+      ]
+    },
+    {
+      "id": "task-5",
+      "priority": 1,
+      "title": "Set Up CI/CD Pipeline",
+      "estimatedTime": "1 hour",
+      "week": 4,
+      "location": "Root directory",
+      "prompt": "I need to set up a GitHub Actions CI/CD pipeline for automated testing and deployment.\n\nRequirements:\n\n1. Create GitHub Actions workflow for testing:\n   File: .github/workflows/test.yml\n   Triggers: Push to main, pull requests\n   Jobs:\n   - Setup Node.js 20\n   - Install dependencies (npm ci)\n   - Run linting (npm run lint)\n   - Run type checking (npm run type-check)\n   - Setup PostgreSQL service for tests\n   - Run database migrations on test DB\n   - Run unit tests (npm run test:unit)\n   - Run integration tests (npm run test:integration)\n   - Upload coverage to Codecov\n   - Fail if coverage < 70%\n\n2. Create GitHub Actions workflow for deployment (Vercel):\n   File: .github/workflows/deploy.yml\n   Triggers: Push to main (after tests pass)\n   Jobs:\n   - Deploy to Vercel production\n   - Comment on PR with deployment URL\n   - Run smoke tests on deployed URL\n\n3. Create GitHub Actions workflow for security:\n   File: .github/workflows/security.yml\n   Triggers: Daily cron, pull requests\n   Jobs:\n   - Run npm audit\n   - Check for known vulnerabilities\n   - Fail if high/critical vulnerabilities found\n\n4. Add branch protection rules documentation:\n   File: .github/BRANCH_PROTECTION.md\n   Document recommended settings:\n   - Require pull request before merging\n   - Require status checks (tests, linting)\n   - Require branches to be up to date\n   - Require linear history\n\n5. Update README.md with CI/CD badges:\n   - Test status badge\n   - Coverage badge\n   - Deployment status badge\n\n6. Create dependabot configuration:\n   File: .github/dependabot.yml\n   - Check for npm dependency updates weekly\n   - Auto-create PRs for security updates\n\nEnvironment secrets needed (document in .github/SECRETS.md):\n- CODECOV_TOKEN (for coverage uploads)\n- VERCEL_TOKEN (for deployments)\n- TEST_DATABASE_URL (for GitHub Actions PostgreSQL)\n\nLocation: Root directory",
+      "verification": {
+        "commands": [
+          "git push origin main",
+          "# Check GitHub Actions tab for workflow runs"
+        ],
+        "expectedOutcome": "All workflows run successfully, branch protection enforced"
+      },
+      "deliverables": [
+        ".github/workflows/test.yml",
+        ".github/workflows/deploy.yml",
+        ".github/workflows/security.yml",
+        ".github/BRANCH_PROTECTION.md",
+        ".github/SECRETS.md",
+        ".github/dependabot.yml",
+        "README.md (updated with badges)"
+      ]
+    },
+    {
+      "id": "task-6",
+      "priority": 1,
+      "title": "Add Error Tracking (Sentry)",
+      "estimatedTime": "45 minutes",
+      "week": 4,
+      "location": "apps/web/",
+      "prompt": "I need to add Sentry error tracking for production error monitoring.\n\nRequirements:\n\n1. Install Sentry SDKs:\n   - @sentry/node (for backend)\n   - @sentry/react (for frontend)\n\n2. Create Sentry configuration:\n   File: apps/web/src/utils/sentry.ts\n   - Initialize Sentry only in production (NODE_ENV === 'production')\n   - Use SENTRY_DSN from environment variables\n   - Set environment: 'production'\n   - Set tracesSampleRate: 0.1 (10% of transactions)\n   - Capture user context (id, email) when available\n   - Add breadcrumbs for API requests\n\n3. Integrate Sentry in server:\n   File: apps/web/__create/index.ts\n   - Import and initialize Sentry at the top\n   - Add Sentry error handler middleware\n   - Capture all unhandled exceptions\n   - Capture API route errors\n\n4. Integrate Sentry in React:\n   File: apps/web/src/entry.client.tsx\n   - Initialize Sentry for React\n   - Add error boundary\n   - Capture React component errors\n\n5. Add Sentry to error handling:\n   Update all API routes to:\n   - Log errors to Sentry before returning error response\n   - Include request context (user, path, method)\n   - Tag errors by API route\n\n6. Update .env.example:\n   - Add SENTRY_DSN (optional, production only)\n   - Add SENTRY_ENVIRONMENT (defaults to NODE_ENV)\n\n7. Create documentation:\n   File: docs/ERROR_TRACKING.md\n   - How to view errors in Sentry dashboard\n   - How to set up alerts\n   - How to debug production errors\n   - Best practices for error messages\n\n8. Add Sentry to DEPLOYMENT.md monitoring section\n\nIMPORTANT: Only enable Sentry in production. Do NOT send errors in development/test.\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "# Set SENTRY_DSN in .env to test project DSN",
+          "# Trigger a test error",
+          "# Verify error appears in Sentry dashboard"
+        ],
+        "expectedOutcome": "Errors are captured in Sentry, user context included"
+      },
+      "deliverables": [
+        "src/utils/sentry.ts",
+        "__create/index.ts (updated)",
+        "src/entry.client.tsx (updated)",
+        "docs/ERROR_TRACKING.md",
+        ".env.example (updated)",
+        "DEPLOYMENT.md (updated)",
+        "package.json (dependencies updated)"
+      ]
+    },
+    {
+      "id": "task-7",
+      "priority": 2,
+      "title": "Add Rate Limiting",
+      "estimatedTime": "1 hour",
+      "week": 4,
+      "location": "apps/web/",
+      "prompt": "I need to add rate limiting to API endpoints to prevent abuse.\n\nRequirements:\n\n1. Install rate limiting library:\n   - @hono/rate-limiter or similar for Hono\n\n2. Create rate limiting middleware:\n   File: apps/web/src/middleware/rateLimit.ts\n   Configurations:\n   - Authentication endpoints: 5 requests/minute per IP\n   - Photo processing: 10 requests/minute per user\n   - Billing endpoints: 20 requests/minute per user\n   - General API: 100 requests/minute per IP\n\n3. Apply rate limiting to routes:\n   - POST /api/auth/signin (5/min per IP)\n   - POST /api/auth/signup (5/min per IP)\n   - POST /api/process-photos (10/min per user)\n   - POST /api/billing/* (20/min per user)\n\n4. Return proper HTTP status code:\n   - 429 Too Many Requests\n   - Include Retry-After header\n\n5. Add rate limit info to API_DOCUMENTATION.md\n\n6. Add tests for rate limiting:\n   File: test/middleware/rateLimit.test.ts\n   - Test that limits are enforced\n   - Test that limits reset after time window\n   - Test different limits for different routes\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test -- test/middleware/rateLimit"
+        ],
+        "expectedOutcome": "Rate limits enforced, tests pass"
+      },
+      "deliverables": [
+        "src/middleware/rateLimit.ts",
+        "test/middleware/rateLimit.test.ts",
+        "API_DOCUMENTATION.md (updated)",
+        "package.json (dependencies updated)"
+      ]
+    },
+    {
+      "id": "task-8",
+      "priority": 2,
+      "title": "Add Request Validation Middleware",
+      "estimatedTime": "1 hour",
+      "week": 4,
+      "location": "apps/web/",
+      "prompt": "I need centralized request validation middleware using Zod schemas.\n\nRequirements:\n\n1. Install Zod:\n   - zod\n   - @hono/zod-validator\n\n2. Create Zod schemas for all API endpoints:\n   File: apps/web/src/schemas/api.ts\n   Schemas needed:\n   - ProcessPhotosSchema (fileUrls, prompt)\n   - UpdateJobSchema (groupName)\n   - CreateCheckoutSchema (lookupKey, quantity, redirectURL)\n   - SignUpSchema (email, password, name)\n   - SignInSchema (email, password)\n\n3. Create validation middleware:\n   File: apps/web/src/middleware/validate.ts\n   - Validates request body against Zod schema\n   - Returns 400 with detailed error messages on validation failure\n   - Type-safe request.body after validation\n\n4. Update API routes to use validation middleware:\n   - Remove manual validation code\n   - Use validated types from schemas\n   - Reduce code duplication\n\n5. Add tests for validation:\n   File: test/middleware/validate.test.ts\n   - Test valid inputs pass\n   - Test invalid inputs are rejected with clear error messages\n\nLocation: apps/web/",
+      "verification": {
+        "commands": [
+          "cd apps/web",
+          "npm run test -- test/middleware/validate"
+        ],
+        "expectedOutcome": "Validation middleware works, API routes simplified"
+      },
+      "deliverables": [
+        "src/schemas/api.ts",
+        "src/middleware/validate.ts",
+        "test/middleware/validate.test.ts",
+        "Updated API routes using validation",
+        "package.json (dependencies updated)"
+      ]
+    }
+  ],
+  "weeklySchedule": {
+    "week1": {
+      "title": "Foundation",
+      "tasks": ["task-1", "task-2", "task-3"],
+      "estimatedTime": "4-5 hours",
+      "goal": "Code quality tools and database migrations in place"
+    },
+    "week2": {
+      "title": "Testing Infrastructure",
+      "tasks": ["task-4-part-1", "task-4-part-2", "task-4-part-3"],
+      "estimatedTime": "4 hours",
+      "goal": "Test infrastructure and auth/billing tests complete"
+    },
+    "week3": {
+      "title": "Integration Testing",
+      "tasks": ["task-4-part-4", "task-4-part-5"],
+      "estimatedTime": "3 hours",
+      "goal": "All API endpoints have comprehensive tests"
+    },
+    "week4": {
+      "title": "Operations",
+      "tasks": ["task-5", "task-6", "task-7", "task-8"],
+      "estimatedTime": "4 hours",
+      "goal": "CI/CD, monitoring, and security hardening complete"
+    }
+  },
+  "finalVerification": {
+    "commands": [
+      "cd apps/web",
+      "npm run lint",
+      "npm run format:check",
+      "npm run type-check",
+      "npm run test:unit",
+      "npm run test:integration",
+      "npm run test:coverage",
+      "npm run db:generate",
+      "npm run db:migrate",
+      "npm run build",
+      "git add .",
+      "git commit -m \"test\""
+    ],
+    "checklist": [
+      "All tests passing",
+      "70%+ code coverage",
+      "No linting errors",
+      "No TypeScript errors",
+      "Database migrations working",
+      "Pre-commit hooks functioning",
+      "Build succeeds",
+      "CI/CD pipeline green",
+      "Error tracking configured",
+      "Documentation updated"
+    ]
+  },
+  "tips": [
+    "One task at a time - don't combine prompts",
+    "Review Claude's changes before committing",
+    "Commit after each successful task",
+    "Run verification steps after each task",
+    "Use the exact prompts provided - they're optimized",
+    "If stuck, provide error messages to Claude for help"
+  ],
+  "gettingUnstuck": {
+    "template": "I'm getting this error when running [task]:\n[paste error message]\n\nHere's what I've tried:\n1. [what you tried]\n2. [what you tried]\n\nPlease help me debug this issue.",
+    "commonIssues": [
+      {
+        "issue": "Tests failing",
+        "solution": "Check error messages carefully, verify test database setup"
+      },
+      {
+        "issue": "Build errors",
+        "solution": "Run npm install, check for TypeScript errors"
+      },
+      {
+        "issue": "Database connection errors",
+        "solution": "Verify DATABASE_URL or TEST_DATABASE_URL in .env"
+      },
+      {
+        "issue": "Git hooks not running",
+        "solution": "Run npx husky install, check .husky/pre-commit exists"
+      }
+    ]
+  }
+}
