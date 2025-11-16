@@ -1,5 +1,6 @@
 import sql from '@/app/api/utils/sql'
 import { auth } from '@/auth'
+import { validateGroupName } from '@/utils/validators'
 
 export async function PATCH(request, { params }) {
   try {
@@ -22,19 +23,12 @@ export async function PATCH(request, { params }) {
     let { groupName } = body || {}
 
     if (groupName != null) {
-      if (typeof groupName !== 'string') {
-        return Response.json(
-          { error: 'groupName must be a string' },
-          { status: 400 }
-        )
+      try {
+        validateGroupName(groupName)
+      } catch (error) {
+        return Response.json({ error: error.message }, { status: 400 })
       }
       groupName = groupName.trim()
-      if (groupName.length > 140) {
-        return Response.json(
-          { error: 'groupName must be 140 characters or less' },
-          { status: 400 }
-        )
-      }
       if (groupName.length === 0) {
         groupName = null // treat empty string as clearing the name
       }
@@ -77,6 +71,46 @@ export async function PATCH(request, { params }) {
     })
   } catch (error) {
     console.error('Update job group name error:', error)
+    return Response.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    const { id } = params || {}
+    const jobId = parseInt(id, 10)
+    if (!jobId || Number.isNaN(jobId)) {
+      return Response.json(
+        { error: 'Valid job ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const session = await auth()
+    const userId = session?.user?.id || null
+    if (!userId) {
+      return Response.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Ensure the job belongs to the current user
+    const rows =
+      await sql`SELECT id, user_id FROM photo_jobs WHERE id = ${jobId} LIMIT 1`
+    if (rows.length === 0) {
+      return Response.json({ error: 'Job not found' }, { status: 404 })
+    }
+    if (String(rows[0].user_id) !== String(userId)) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Delete the job
+    await sql`DELETE FROM photo_jobs WHERE id = ${jobId}`
+
+    return Response.json({
+      success: true,
+      message: 'Job deleted successfully',
+    })
+  } catch (error) {
+    console.error('Delete job error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

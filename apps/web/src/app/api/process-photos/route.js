@@ -1,19 +1,19 @@
 import sql from '@/app/api/utils/sql'
 import upload from '@/app/api/utils/upload' // NEW: use platform uploader to store generated files (zip)
 import { auth } from '@/auth' // Enforce sign-in and track credits
+import { validateFileUrls, validatePrompt } from '@/utils/validators'
 
 export async function POST(request) {
   try {
     const body = await request.json()
     const { fileUrls, prompt, fileCount } = body
 
-    // Validate input
-    if (!fileUrls || !Array.isArray(fileUrls) || fileUrls.length === 0) {
-      return Response.json({ error: 'No file URLs provided' }, { status: 400 })
-    }
-
-    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
-      return Response.json({ error: 'Prompt is required' }, { status: 400 })
+    // Validate input using centralized validation functions
+    try {
+      validateFileUrls(fileUrls)
+      validatePrompt(prompt)
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 400 })
     }
 
     if (!fileCount || fileCount <= 0 || fileCount > 30) {
@@ -21,17 +21,6 @@ export async function POST(request) {
         { error: 'File count must be between 1 and 30' },
         { status: 400 }
       )
-    }
-
-    // SECURITY: pre-validate uploaded URLs to avoid SSRF and bad protocols
-    for (const u of fileUrls) {
-      const { ok, reason } = isSafeExternalUrl(u)
-      if (!ok) {
-        return Response.json(
-          { error: 'Invalid file URL', details: reason || 'Blocked URL' },
-          { status: 400 }
-        )
-      }
     }
 
     // Enforce authentication (trial requires sign-in)
@@ -225,40 +214,12 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-// SECURITY: basic SSRF guard — allow only https and block localhost/private IPs
-function isSafeExternalUrl(urlStr) {
-  try {
-    const u = new URL(urlStr)
-    if (u.protocol !== 'https:') {
-      return { ok: false, reason: 'Only https URLs are allowed' }
-    }
-    const host = (u.hostname || '').toLowerCase()
-    // block localhost and IPv6 loopback
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
-      return { ok: false, reason: 'Local addresses are not allowed' }
-    }
-    // Block common private ranges when hostname is an IP literal
-    const privateIpPatterns = [
-      /^(10)\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/, // 10.0.0.0/8
-      /^(172)\.(1[6-9]|2[0-9]|3[0-1])\.(\d{1,3})\.(\d{1,3})$/, // 172.16.0.0 - 172.31.255.255
-      /^(192)\.(168)\.(\d{1,3})\.(\d{1,3})$/, // 192.168.0.0/16
-      /^(169)\.(254)\.(\d{1,3})\.(\d{1,3})$/, // link-local
-    ]
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      for (const re of privateIpPatterns) {
-        if (re.test(host)) {
-          return { ok: false, reason: 'Private IPs are not allowed' }
-        }
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, reason: 'Malformed URL' }
-  }
-}
+// SECURITY: SSRF protection now handled by centralized validators in @/utils/validators
 
 // Calls Google Gemini 2.5 Flash Image Preview to create enhanced images
 async function generateEnhancedImagesWithGemini({ fileUrls, prompt, apiKey }) {
+  // Import validators locally for use in this function
+  const { validateFileUrls } = await import('@/utils/validators.ts')
   const modelPrimary = 'gemini-2.5-flash-image-preview'
   const modelFallback = 'gemini-2.5-flash'
   const results = []
@@ -267,9 +228,10 @@ async function generateEnhancedImagesWithGemini({ fileUrls, prompt, apiKey }) {
     const srcUrl = fileUrls[i]
 
     // SECURITY: validate again inside the generator for defense in depth
-    const pre = isSafeExternalUrl(srcUrl)
-    if (!pre.ok) {
-      throw new Error(`Blocked source URL [${i + 1}]: ${pre.reason}`)
+    try {
+      validateFileUrls([srcUrl])
+    } catch (error) {
+      throw new Error(`Blocked source URL [${i + 1}]: ${error.message}`)
     }
 
     const imgResp = await fetch(srcUrl)

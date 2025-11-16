@@ -132,7 +132,14 @@ StageInSeconds is a full-stack application that allows real estate professionals
 
 4. **Set up the database**:
 
-   See [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) for schema setup instructions.
+   Run database migrations using Drizzle ORM:
+   ```bash
+   cd apps/web
+   npm run db:generate  # Generate migration files
+   npm run db:migrate   # Run migrations
+   ```
+
+   See [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) for complete schema documentation.
 
 5. **Start the development server**:
    ```bash
@@ -276,7 +283,9 @@ See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for detailed endpoint documen
 
 ## Database Schema
 
-The application uses PostgreSQL with the following tables:
+The application uses PostgreSQL with Drizzle ORM for migrations.
+
+### Tables
 
 - `auth_users` - User accounts
 - `auth_accounts` - OAuth accounts (for future providers)
@@ -284,8 +293,25 @@ The application uses PostgreSQL with the following tables:
 - `auth_verification_token` - Email verification tokens
 - `photo_jobs` - Photo processing jobs
 - `user_credits` - User credit balances
+- `purchases` - Purchase transaction records
 
-See [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) for complete schema and migration instructions.
+### Database Commands
+
+```bash
+# Generate migration from schema changes
+npm run db:generate
+
+# Run migrations
+npm run db:migrate
+
+# Open Drizzle Studio (database browser)
+npm run db:studio
+
+# Push schema changes directly (dev only)
+npm run db:push
+```
+
+See [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) for complete schema documentation.
 
 ---
 
@@ -327,7 +353,8 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions for va
 This application is functional but requires additional work before production deployment:
 
 - [ ] Add comprehensive test suite
-- [ ] Set up database migrations
+- [x] Set up database migrations (Drizzle ORM)
+- [x] Add ESLint and Prettier with pre-commit hooks
 - [ ] Configure CI/CD pipeline
 - [ ] Add monitoring and logging
 - [ ] Complete security audit
