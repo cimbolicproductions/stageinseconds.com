@@ -61,7 +61,7 @@ jobs:
 
       - name: Create issue for vulnerabilities
         if: failure() && github.event_name == 'schedule' && env.VULNERABILITIES_FOUND == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
