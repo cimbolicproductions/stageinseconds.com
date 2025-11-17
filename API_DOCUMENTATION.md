@@ -97,12 +97,119 @@ Routes requiring authentication return `401 Unauthorized` if no valid session ex
 
 ## Rate Limiting
 
-**Current Status**: Not implemented (should be added before production)
+**Current Status**: Implemented with configurable limits
 
-**Recommended Limits**:
-- Authentication endpoints: 5 requests/minute per IP
-- Photo processing: 10 requests/minute per user
-- General API: 100 requests/minute per user
+All API endpoints are protected by rate limiting to prevent abuse and ensure fair usage. Rate limits are enforced per IP address for unauthenticated endpoints and per user ID for authenticated endpoints.
+
+### Rate Limit Tiers
+
+| Endpoint Category | Limit | Window | Key | Endpoints |
+|-------------------|-------|--------|-----|-----------|
+| Authentication | 5 requests | 1 minute | IP Address | `/api/auth/signin`, `/api/auth/signup`, `/api/auth/send-verification` |
+| Photo Processing | 10 requests | 1 minute | User ID (or IP) | `/api/process-photos` |
+| Billing | 20 requests | 1 minute | User ID (or IP) | `/api/billing/create-checkout`, `/api/billing/stripe-webhook` |
+| General API | 100 requests | 1 minute | IP Address | All other `/api/*` endpoints |
+
+### Rate Limit Response
+
+When you exceed the rate limit, the API returns a `429 Too Many Requests` response:
+
+**Status Code**: `429 Too Many Requests`
+
+**Headers**:
+```
+Retry-After: 60
+X-RateLimit-Limit: 5
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1699564920
+```
+
+**Response Body**:
+```json
+{
+  "error": "Too many authentication attempts. Please try again in 1 minute.",
+  "retryAfter": 60
+}
+```
+
+### Rate Limit Headers
+
+All API responses include rate limit headers:
+
+- `X-RateLimit-Limit`: Maximum number of requests allowed in the window
+- `X-RateLimit-Remaining`: Number of requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when the rate limit window resets
+- `Retry-After`: (Only on 429 responses) Seconds to wait before retrying
+
+### Handling Rate Limits in Client Code
+
+**Best Practices**:
+
+1. **Check rate limit headers** in all responses to track remaining requests
+2. **Implement exponential backoff** when receiving 429 responses
+3. **Respect the Retry-After header** before making another request
+4. **Distribute requests evenly** instead of bursting all at once
+
+**Example Client Code** (JavaScript):
+
+```javascript
+async function makeApiRequest(url, options) {
+  const response = await fetch(url, options);
+
+  // Check if rate limited
+  if (response.status === 429) {
+    const retryAfter = parseInt(response.headers.get('Retry-After')) || 60;
+    console.log(`Rate limited. Retry after ${retryAfter} seconds`);
+
+    // Wait and retry
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+    return makeApiRequest(url, options);
+  }
+
+  // Log remaining requests
+  const remaining = response.headers.get('X-RateLimit-Remaining');
+  console.log(`Requests remaining: ${remaining}`);
+
+  return response;
+}
+```
+
+### Rate Limit Configuration
+
+Rate limits can be configured via environment variables:
+
+```bash
+# Enable/disable rate limiting (default: true, false in test environment)
+RATE_LIMIT_ENABLED=true
+
+# Rate limit window in milliseconds (default: 60000 = 1 minute)
+RATE_LIMIT_WINDOW=60000
+
+# Maximum requests per window for each tier
+RATE_LIMIT_AUTH_MAX=5        # Authentication endpoints
+RATE_LIMIT_PHOTO_MAX=10      # Photo processing
+RATE_LIMIT_BILLING_MAX=20    # Billing endpoints
+RATE_LIMIT_GENERAL_MAX=100   # General API endpoints
+```
+
+### IP Address Detection
+
+Rate limiting uses the following priority for IP address detection:
+
+1. `x-forwarded-for` header (first IP in list) - for proxied requests (Vercel, Cloudflare)
+2. `x-real-ip` header - alternative proxy header
+3. `unknown` - fallback if no IP can be determined
+
+### Security Considerations
+
+1. **Brute Force Protection**: Authentication endpoints are strictly limited (5/min) to prevent credential stuffing and brute force attacks
+2. **Resource Protection**: Photo processing is limited (10/min) to prevent abuse of expensive AI operations
+3. **DoS Prevention**: General API rate limit (100/min) protects against denial of service attacks
+4. **Logging**: All rate limit violations are logged with IP address, user ID, and endpoint for monitoring
+
+### Test Environment
+
+Rate limiting is **automatically disabled** in test environments (`NODE_ENV=test`) to prevent interference with automated tests. In production, rate limiting is always enabled unless explicitly disabled via `RATE_LIMIT_ENABLED=false`.
 
 ---
 

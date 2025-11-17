@@ -334,6 +334,12 @@ After your first deployment, configure Stripe to send webhooks to your app:
 | `NODE_ENV` | Auto-set to `production` by Vercel | Auto |
 | `LOG_LEVEL` | Log level: trace, debug, info, warn, error, fatal (default: info) | No |
 | `LOGTAIL_TOKEN` | LogTail/BetterStack source token (optional, free tier available) | No |
+| `RATE_LIMIT_ENABLED` | Enable/disable rate limiting (default: true, auto-disabled in test) | No |
+| `RATE_LIMIT_WINDOW` | Rate limit window in milliseconds (default: 60000 = 1 minute) | No |
+| `RATE_LIMIT_AUTH_MAX` | Max auth requests per window (default: 5) | No |
+| `RATE_LIMIT_PHOTO_MAX` | Max photo processing requests per window (default: 10) | No |
+| `RATE_LIMIT_BILLING_MAX` | Max billing requests per window (default: 20) | No |
+| `RATE_LIMIT_GENERAL_MAX` | Max general API requests per window (default: 100) | No |
 
 ### Setting Environment Variables
 
@@ -584,6 +590,53 @@ requestId = "abc123"
 ```
 
 For detailed logging documentation, see [docs/LOGGING.md](./docs/LOGGING.md).
+
+### Rate Limiting Monitoring
+
+The application includes rate limiting to protect API endpoints from abuse. Rate limit violations are automatically logged for monitoring.
+
+**Monitoring Rate Limits**:
+
+1. **View Rate Limit Violations**:
+   - Vercel Dashboard → Logs → Search for "Rate limit exceeded"
+   - Filter by `level:40` (warn) to find all rate limit violations
+   - LogTail/BetterStack: Search for `message:"Rate limit exceeded"`
+
+2. **Analyze Patterns**:
+   ```
+   # Find repeated violations from same IP
+   message:"Rate limit exceeded" AND ip:"192.168.1.100"
+
+   # Find violations by endpoint
+   message:"Rate limit exceeded" AND limitType:"authRateLimit"
+
+   # Count violations by user
+   message:"Rate limit exceeded" AND userId:"user_123"
+   ```
+
+3. **Rate Limit Configuration** (optional adjustments):
+   - Default limits are production-ready
+   - Adjust via environment variables if needed:
+     - `RATE_LIMIT_AUTH_MAX=5` (auth endpoints)
+     - `RATE_LIMIT_PHOTO_MAX=10` (photo processing)
+     - `RATE_LIMIT_BILLING_MAX=20` (billing endpoints)
+     - `RATE_LIMIT_GENERAL_MAX=100` (general API)
+   - Monitor violations before increasing limits
+
+4. **Security Alerts**:
+   - Set up alerts in LogTail/BetterStack for:
+     - More than 10 rate limit violations from same IP in 5 minutes (potential attack)
+     - Unusual spike in rate limit violations (DDoS attempt)
+     - Rate limit violations on auth endpoints (brute force attempt)
+
+**Rate Limit Headers in Responses**:
+All API responses include rate limit information:
+- `X-RateLimit-Limit`: Maximum requests allowed
+- `X-RateLimit-Remaining`: Requests remaining in window
+- `X-RateLimit-Reset`: When the limit resets (Unix timestamp)
+- `Retry-After`: (429 responses only) Seconds to wait
+
+For complete rate limiting documentation, see the [Rate Limiting section in API_DOCUMENTATION.md](./API_DOCUMENTATION.md#rate-limiting).
 
 ### External Monitoring (Optional)
 

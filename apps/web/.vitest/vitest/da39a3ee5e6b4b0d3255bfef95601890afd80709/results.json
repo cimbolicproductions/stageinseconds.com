@@ -16,6 +16,14 @@
     [":test/api/auth.test.ts", { "duration": 0, "failed": false }],
     [":test/api/billing.test.ts", { "duration": 0, "failed": false }],
     [":test/api/process-photos.test.ts", { "duration": 0, "failed": false }],
-    [":test/api/jobs.test.ts", { "duration": 0, "failed": false }]
+    [":test/api/jobs.test.ts", { "duration": 0, "failed": false }],
+    [
+      ":test/middleware/rateLimit.test.ts",
+      { "duration": 9132.540700000001, "failed": true }
+    ],
+    [
+      ":test/middleware/rateLimit.simple.test.ts",
+      { "duration": 3704.8422000000005, "failed": true }
+    ]
   ]
 }

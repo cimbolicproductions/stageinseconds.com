@@ -47,6 +47,7 @@
     "color2k": "^2.0.3",
     "date-fns": "^4.1.0",
     "downshift": "^9.0.9",
+    "hono-rate-limiter": "^0.4.2",
     "isbot": "^5.1.27",
     "lodash-es": "^4.17.21",
     "lucide-react": "0.358.0",

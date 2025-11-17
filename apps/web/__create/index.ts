@@ -19,6 +19,12 @@ import { getHTMLForErrorPage } from './get-html-for-error-page';
 import { isAuthAction } from './is-auth-action';
 import { API_BASENAME, api } from './route-builder';
 import logger, { logError } from '../src/utils/logger';
+import {
+  authRateLimit,
+  photoProcessingRateLimit,
+  billingRateLimit,
+  generalApiRateLimit,
+} from '../src/middleware/rateLimit';
 neonConfig.webSocketConstructor = ws;
 
 // Handle unhandled promise rejections
@@ -113,6 +119,22 @@ app.onError((err, c) => {
   }
   return c.html(getHTMLForErrorPage(err), 200);
 });
+
+// Apply rate limiting middleware (more restrictive limits first)
+// Auth rate limiting - 5 requests per minute per IP
+app.use('/api/auth/signin', authRateLimit());
+app.use('/api/auth/signup', authRateLimit());
+app.use('/api/auth/send-verification', authRateLimit());
+
+// Photo processing rate limiting - 10 requests per minute per user
+app.use('/api/process-photos', photoProcessingRateLimit());
+
+// Billing rate limiting - 20 requests per minute per user/IP
+app.use('/api/billing/create-checkout', billingRateLimit());
+app.use('/api/billing/stripe-webhook', billingRateLimit());
+
+// General API rate limiting - 100 requests per minute per IP (applied last)
+app.use('/api/*', generalApiRateLimit());
 
 if (process.env.CORS_ORIGINS) {
   app.use(
