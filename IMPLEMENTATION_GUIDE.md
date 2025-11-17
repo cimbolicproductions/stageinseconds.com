@@ -563,72 +563,93 @@ Location: Root directory
 
 ---
 
-### Task 6: Add Error Tracking
+### Task 6: Add Error Tracking and Logging
 
 **Estimated Time**: 45 minutes
 
 **Prompt for Claude Code**:
 
 ```
-I need to add Sentry error tracking for production error monitoring.
+I need to add comprehensive error tracking and logging using FREE tools for production error monitoring.
 
 Requirements:
 
-1. Install Sentry SDKs:
-   - @sentry/node (for backend)
-   - @sentry/react (for frontend)
+1. Install Pino logging packages (100% FREE):
+   - pino (fast, low-overhead logger)
+   - pino-pretty (pretty printing for development)
+   - pino-http (HTTP logging middleware for Hono)
+   - @logtail/pino (OPTIONAL: for free log aggregation)
 
-2. Create Sentry configuration:
-   File: apps/web/src/utils/sentry.ts
-   - Initialize Sentry only in production (NODE_ENV === 'production')
-   - Use SENTRY_DSN from environment variables
-   - Set environment: 'production'
-   - Set tracesSampleRate: 0.1 (10% of transactions)
-   - Capture user context (id, email) when available
-   - Add breadcrumbs for API requests
+2. Create logger configuration:
+   File: apps/web/src/utils/logger.ts
+   - Create Pino logger instance with structured logging
+   - Different log levels: error, warn, info, debug, trace
+   - Pretty printing in development (pino-pretty)
+   - JSON logging in production (for log aggregation)
+   - Context enrichment: requestId, userId, path, method
+   - Error serialization with stack traces
+   - Optional: Integration with BetterStack/LogTail (free tier: 1GB/month)
 
-3. Integrate Sentry in server:
+3. Integrate Pino in server:
    File: apps/web/__create/index.ts
-   - Import and initialize Sentry at the top
-   - Add Sentry error handler middleware
-   - Capture all unhandled exceptions
-   - Capture API route errors
+   - Import and initialize Pino logger
+   - Add pino-http middleware for automatic request/response logging
+   - Create error handler middleware that logs all errors
+   - Capture all unhandled exceptions and log them
+   - Add request correlation IDs for tracing
 
-4. Integrate Sentry in React:
+4. Integrate logging in React:
    File: apps/web/src/entry.client.tsx
-   - Initialize Sentry for React
-   - Add error boundary
-   - Capture React component errors
+   - Create client-side error logger (console or send to API endpoint)
+   - Add error boundary that logs React errors
+   - Optional: Send critical frontend errors to backend logging endpoint
 
-5. Add Sentry to error handling:
+5. Update API routes to use structured logging:
    Update all API routes to:
-   - Log errors to Sentry before returning error response
-   - Include request context (user, path, method)
-   - Tag errors by API route
+   - Log errors using logger.error() before returning error response
+   - Include request context (userId, requestId, path, method)
+   - Add custom fields for filtering (apiRoute, statusCode, errorType)
+   - Log important events: user signup, payment success, job creation
 
 6. Update .env.example:
-   - Add SENTRY_DSN (optional, production only)
-   - Add SENTRY_ENVIRONMENT (defaults to NODE_ENV)
+   - Add LOG_LEVEL (defaults to 'info')
+   - Add LOGTAIL_TOKEN (optional, for free log aggregation)
+   - Document NODE_ENV usage (determines pretty vs JSON logging)
 
 7. Create documentation:
-   File: docs/ERROR_TRACKING.md
-   - How to view errors in Sentry dashboard
-   - How to set up alerts
-   - How to debug production errors
-   - Best practices for error messages
+   File: docs/LOGGING.md
+   - How logging works in this application
+   - Log levels and when to use them (error, warn, info, debug)
+   - How to view logs locally (pino-pretty output)
+   - How to view logs in production (file-based or log aggregation)
+   - Optional: Setting up BetterStack/LogTail (free tier)
+   - Optional: Setting up Papertrail (free tier)
+   - How to search and filter logs
+   - Best practices for logging (what to log, what not to log)
+   - Understanding log context and correlation IDs
 
-8. Add Sentry to DEPLOYMENT.md monitoring section
+8. Update DEPLOYMENT.md:
+   - Add logging section with instructions for viewing logs in production
+   - Document free log aggregation options (BetterStack, Papertrail, file-based)
 
-IMPORTANT: Only enable Sentry in production. Do NOT send errors in development/test.
+IMPORTANT:
+- Pino is 100% FREE and one of the fastest Node.js loggers
+- BetterStack/LogTail free tier: 1GB/month (enough for hobby projects)
+- Papertrail free tier: 50MB/day (plenty for small apps)
+- File-based logging is completely free (requires log rotation)
+- Do NOT log passwords, credit cards, or sensitive data
+- Structured logging (JSON) makes it easy to search and filter
 
 Location: apps/web/
 ```
 
 **Verification**:
 ```bash
-# Set SENTRY_DSN in .env (use test project)
-# Trigger a test error
-# Verify error appears in Sentry dashboard
+cd apps/web
+# Start dev server and verify pretty logs appear
+npm run dev
+# Trigger a test error and verify it's logged with context
+# Make API requests and verify request/response logging
 ```
 
 ---
@@ -839,7 +860,7 @@ You'll know you're production-ready when:
 ✅ ESLint and Prettier configured with pre-commit hooks
 ✅ Database migrations working
 ✅ CI/CD pipeline green on GitHub Actions
-✅ Error tracking configured (Sentry)
+✅ Error tracking and logging configured (Pino)
 ✅ Rate limiting active on API endpoints
 ✅ Request validation using Zod schemas
 ✅ No high/critical security vulnerabilities

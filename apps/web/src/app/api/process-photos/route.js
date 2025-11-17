@@ -2,8 +2,10 @@ import sql from '@/app/api/utils/sql'
 import upload from '@/app/api/utils/upload' // NEW: use platform uploader to store generated files (zip)
 import { auth } from '@/auth' // Enforce sign-in and track credits
 import { validateFileUrls, validatePrompt } from '@/utils/validators'
+import { logError, logEvent } from '@/app/api/utils/logger.js'
 
 export async function POST(request) {
+  let session
   try {
     const body = await request.json()
     const { fileUrls, prompt, fileCount } = body
@@ -24,7 +26,7 @@ export async function POST(request) {
     }
 
     // Enforce authentication (trial requires sign-in)
-    const session = await auth()
+    session = await auth()
     const userId = session?.user?.id || null
     if (!userId) {
       return Response.json(
@@ -147,6 +149,15 @@ export async function POST(request) {
         await sql.transaction(queries)
       }
 
+      logEvent('photo_processing_completed', request, {
+        userId,
+        jobId: job?.id,
+        photoCount: fileCount,
+        cost,
+        freeUsed: willBeFree,
+        creditsUsed: needsPaid,
+      })
+
       return Response.json({
         success: true,
         job: job
@@ -172,7 +183,14 @@ export async function POST(request) {
         applied: { free: willBeFree, paid: needsPaid },
       })
     } catch (apiError) {
-      console.error('Gemini processing error:', apiError)
+      logError(apiError, request, {
+        apiRoute: 'process-photos',
+        userId,
+        jobId: job?.id,
+        photoCount: fileCount,
+        statusCode: 502,
+        errorType: 'gemini_api_error',
+      })
 
       if (hasDB && job?.id) {
         try {
@@ -182,7 +200,12 @@ export async function POST(request) {
             WHERE id = ${job.id}
           `
         } catch (e) {
-          console.error('Failed to update job status to failed:', e)
+          logError(e, request, {
+            apiRoute: 'process-photos',
+            userId,
+            jobId: job?.id,
+            errorType: 'job_status_update_failed',
+          })
         }
       }
 
@@ -197,7 +220,11 @@ export async function POST(request) {
       )
     }
   } catch (error) {
-    console.error('Process photos error:', error)
+    logError(error, request, {
+      apiRoute: 'process-photos',
+      userId: session?.user?.id,
+      statusCode: 500,
+    })
     return Response.json(
       {
         error: 'Internal server error',

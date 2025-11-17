@@ -1,4 +1,5 @@
 import sql from '@/app/api/utils/sql'
+import { logError, logEvent, logWarn } from '@/app/api/utils/logger.js'
 
 function generateToken() {
   try {
@@ -39,8 +40,9 @@ async function sendEmail({ to, subject, html }) {
 }
 
 export async function POST(request) {
+  let body
   try {
-    const body = await request.json().catch(() => ({}))
+    body = await request.json().catch(() => ({}))
     const email = (body.email || '').toLowerCase().trim()
     if (!email) {
       return Response.json({ error: 'Email is required' }, { status: 400 })
@@ -48,8 +50,13 @@ export async function POST(request) {
 
     // NEW: fail fast if email provider is not configured to avoid silent success
     if (!process.env.RESEND_API_KEY) {
-      console.warn(
-        '[send-verification] Missing RESEND_API_KEY; email sending is not configured'
+      logWarn(
+        'Missing RESEND_API_KEY; email sending is not configured',
+        request,
+        {
+          apiRoute: 'send-verification',
+          email,
+        }
       )
       return Response.json(
         {
@@ -93,15 +100,21 @@ export async function POST(request) {
     // Only send if user exists; if not, still return success silently
     if (user?.email) {
       await sendEmail({ to: email, subject: 'Confirm your email', html })
+      logEvent('verification_email_sent', request, { email, userId: user.id })
     } else {
-      console.log(
-        `[send-verification] No user for ${email}; skipping provider send`
-      )
+      logWarn('No user found for email; skipping verification email', request, {
+        apiRoute: 'send-verification',
+        email,
+      })
     }
 
     return Response.json({ ok: true })
   } catch (error) {
-    console.error('/api/auth/send-verification error', error)
+    logError(error, request, {
+      apiRoute: 'send-verification',
+      email: body?.email,
+      statusCode: 500,
+    })
     return Response.json(
       { error: 'Failed to send verification' },
       { status: 500 }

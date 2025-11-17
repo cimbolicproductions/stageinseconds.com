@@ -33,6 +33,7 @@ import { HotReloadIndicator } from '../__create/HotReload'
 import { useSandboxStore } from '../__create/hmr-sandbox-store'
 import type { Route } from './+types/root'
 import { useDevServerHeartbeat } from '../__create/useDevServerHeartbeat'
+import { clientLogger } from '../utils/client-logger'
 
 export const links = () => []
 
@@ -197,6 +198,14 @@ class ErrorBoundaryWrapper extends Component<
 
   componentDidCatch(error: unknown, info: unknown) {
     console.error(error, info)
+    // Log error to client logger for tracking
+    clientLogger.error(error, {
+      componentStack:
+        info && typeof info === 'object' && 'componentStack' in info
+          ? String(info.componentStack)
+          : undefined,
+      errorBoundary: 'ErrorBoundaryWrapper',
+    })
   }
 
   render() {

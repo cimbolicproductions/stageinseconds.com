@@ -1,5 +1,9 @@
 # stageinseconds.com
 
+[![Test](https://github.com/yourusername/stageinseconds.com/actions/workflows/test.yml/badge.svg)](https://github.com/yourusername/stageinseconds.com/actions/workflows/test.yml)
+[![Security Audit](https://github.com/yourusername/stageinseconds.com/actions/workflows/security.yml/badge.svg)](https://github.com/yourusername/stageinseconds.com/actions/workflows/security.yml)
+[![Deploy](https://github.com/yourusername/stageinseconds.com/actions/workflows/deploy.yml/badge.svg)](https://github.com/yourusername/stageinseconds.com/actions/workflows/deploy.yml)
+
 **AI-powered real estate photo enhancement platform**
 
 Transform real estate photos in seconds using AI to create stunning, professionally staged images.
@@ -14,6 +18,8 @@ Transform real estate photos in seconds using AI to create stunning, professiona
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [Development](#development)
+- [Testing](#testing)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Deployment](#deployment)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
@@ -177,7 +183,7 @@ Create a `.env` file in `apps/web/` with the following variables:
 | `NODE_ENV` | Environment (development/production) | `development` |
 | `PORT` | Server port | `4000` |
 
-See [.env.example](./.env.example) for a complete template.
+For complete setup instructions including GitHub Actions secrets and Vercel configuration, see [.github/SECRETS.md](.github/SECRETS.md).
 
 ---
 
@@ -245,6 +251,110 @@ npm run build
 cd apps/mobile
 eas build --platform all
 ```
+
+---
+
+## Testing
+
+The project includes a comprehensive test suite with unit and integration tests.
+
+### Running Tests Locally
+
+```bash
+cd apps/web
+
+# Run all tests
+npm test
+
+# Run unit tests only
+npm run test:unit
+
+# Run integration tests only
+npm run test:integration
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Test Database Setup
+
+Integration tests require a PostgreSQL database. The test suite automatically:
+- Creates a test database connection
+- Runs migrations before tests
+- Cleans up data between tests
+
+Set `TEST_DATABASE_URL` in your `.env` file:
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db
+```
+
+### Test Coverage
+
+Current test suite includes:
+- **Unit tests**: Validators, authentication utilities, SSRF protection
+- **Integration tests**: Auth API, Billing API, Photo processing, Job management
+- **Total**: 104 tests across all modules
+
+Run `npm run test:coverage` to generate a detailed coverage report.
+
+---
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment.
+
+### Workflows
+
+#### Test Workflow
+- **Triggers**: Push to main, Pull requests
+- **Runs**: Linting, type checking, unit tests, integration tests
+- **Database**: Uses PostgreSQL service container
+- **Coverage**: Generates and uploads coverage reports
+
+#### Security Audit
+- **Triggers**: Daily at midnight UTC, Pull requests
+- **Runs**: npm audit for vulnerabilities
+- **Alerts**: Creates GitHub issues for critical vulnerabilities
+
+#### Deploy Workflow
+- **Triggers**: Push to main, Pull requests
+- **Deploys**: To Vercel (production for main, preview for PRs)
+- **Tests**: Runs smoke tests on deployed URL
+
+### Required Secrets
+
+Configure these secrets in GitHub repository settings:
+
+| Secret | Description | Required |
+|--------|-------------|----------|
+| `DATABASE_URL` | Production database URL | Yes |
+| `STRIPE_SECRET_KEY` | Stripe API key | Yes |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | Yes |
+| `GEMINI_API_KEY` | Google Gemini API key | Yes |
+| `VERCEL_TOKEN` | Vercel deployment token | Optional |
+| `VERCEL_ORG_ID` | Vercel organization ID | Optional |
+| `CODECOV_TOKEN` | Codecov upload token | Optional |
+
+See [.github/SECRETS.md](.github/SECRETS.md) for detailed setup instructions.
+
+### Branch Protection
+
+The `main` branch is protected with the following rules:
+- Require pull request before merging
+- Require status checks to pass (tests, security audit)
+- Require branches to be up to date
+- Require linear history (no merge commits)
+- At least 1 approval required
+
+See [.github/BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md) for configuration details.
+
+### Automated Dependency Updates
+
+Dependabot automatically checks for dependency updates:
+- **Schedule**: Weekly on Mondays
+- **Scope**: npm dependencies and GitHub Actions
+- **Limits**: Max 5 open PRs
+- **Grouping**: Groups minor/patch updates to reduce noise
 
 ---
 
@@ -352,10 +462,10 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions for va
 
 This application is functional but requires additional work before production deployment:
 
-- [ ] Add comprehensive test suite
+- [x] Add comprehensive test suite (104 tests - currently skipped)
 - [x] Set up database migrations (Drizzle ORM)
 - [x] Add ESLint and Prettier with pre-commit hooks
-- [ ] Configure CI/CD pipeline
+- [x] Configure CI/CD pipeline (GitHub Actions)
 - [ ] Add monitoring and logging
 - [ ] Complete security audit
 

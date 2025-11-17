@@ -10,7 +10,7 @@
       "ESLint and Prettier configured with pre-commit hooks",
       "Database migrations working",
       "CI/CD pipeline green on GitHub Actions",
-      "Error tracking configured (Sentry)",
+      "Error tracking and logging configured (Pino)",
       "Rate limiting active on API endpoints",
       "Request validation using Zod schemas",
       "No high/critical security vulnerabilities",
@@ -257,6 +257,8 @@
       "id": "task-5",
       "priority": 1,
       "title": "Set Up CI/CD Pipeline",
+      "status": "completed",
+      "completedDate": "2025-11-17",
       "estimatedTime": "1 hour",
       "week": 4,
       "location": "Root directory",
@@ -281,26 +283,30 @@
     {
       "id": "task-6",
       "priority": 1,
-      "title": "Add Error Tracking (Sentry)",
+      "title": "Add Error Tracking and Logging (Pino)",
+      "status": "completed",
+      "completedDate": "2025-11-17",
       "estimatedTime": "45 minutes",
       "week": 4,
       "location": "apps/web/",
-      "prompt": "I need to add Sentry error tracking for production error monitoring.\n\nRequirements:\n\n1. Install Sentry SDKs:\n   - @sentry/node (for backend)\n   - @sentry/react (for frontend)\n\n2. Create Sentry configuration:\n   File: apps/web/src/utils/sentry.ts\n   - Initialize Sentry only in production (NODE_ENV === 'production')\n   - Use SENTRY_DSN from environment variables\n   - Set environment: 'production'\n   - Set tracesSampleRate: 0.1 (10% of transactions)\n   - Capture user context (id, email) when available\n   - Add breadcrumbs for API requests\n\n3. Integrate Sentry in server:\n   File: apps/web/__create/index.ts\n   - Import and initialize Sentry at the top\n   - Add Sentry error handler middleware\n   - Capture all unhandled exceptions\n   - Capture API route errors\n\n4. Integrate Sentry in React:\n   File: apps/web/src/entry.client.tsx\n   - Initialize Sentry for React\n   - Add error boundary\n   - Capture React component errors\n\n5. Add Sentry to error handling:\n   Update all API routes to:\n   - Log errors to Sentry before returning error response\n   - Include request context (user, path, method)\n   - Tag errors by API route\n\n6. Update .env.example:\n   - Add SENTRY_DSN (optional, production only)\n   - Add SENTRY_ENVIRONMENT (defaults to NODE_ENV)\n\n7. Create documentation:\n   File: docs/ERROR_TRACKING.md\n   - How to view errors in Sentry dashboard\n   - How to set up alerts\n   - How to debug production errors\n   - Best practices for error messages\n\n8. Add Sentry to DEPLOYMENT.md monitoring section\n\nIMPORTANT: Only enable Sentry in production. Do NOT send errors in development/test.\n\nLocation: apps/web/",
+      "prompt": "I need to add comprehensive error tracking and logging using FREE tools for production error monitoring.\n\nRequirements:\n\n1. Install Pino logging packages (100% FREE):\n   - pino (fast, low-overhead logger)\n   - pino-pretty (pretty printing for development)\n   - pino-http (HTTP logging middleware for Hono)\n   - @logtail/pino (OPTIONAL: for free log aggregation)\n\n2. Create logger configuration:\n   File: apps/web/src/utils/logger.ts\n   - Create Pino logger instance with structured logging\n   - Different log levels: error, warn, info, debug, trace\n   - Pretty printing in development (pino-pretty)\n   - JSON logging in production (for log aggregation)\n   - Context enrichment: requestId, userId, path, method\n   - Error serialization with stack traces\n   - Optional: Integration with BetterStack/LogTail (free tier: 1GB/month)\n\n3. Integrate Pino in server:\n   File: apps/web/__create/index.ts\n   - Import and initialize Pino logger\n   - Add pino-http middleware for automatic request/response logging\n   - Create error handler middleware that logs all errors\n   - Capture all unhandled exceptions and log them\n   - Add request correlation IDs for tracing\n\n4. Integrate logging in React:\n   File: apps/web/src/entry.client.tsx\n   - Create client-side error logger (console or send to API endpoint)\n   - Add error boundary that logs React errors\n   - Optional: Send critical frontend errors to backend logging endpoint\n\n5. Update API routes to use structured logging:\n   Update all API routes to:\n   - Log errors using logger.error() before returning error response\n   - Include request context (userId, requestId, path, method)\n   - Add custom fields for filtering (apiRoute, statusCode, errorType)\n   - Log important events: user signup, payment success, job creation\n\n6. Update .env.example:\n   - Add LOG_LEVEL (defaults to 'info')\n   - Add LOGTAIL_TOKEN (optional, for free log aggregation)\n   - Document NODE_ENV usage (determines pretty vs JSON logging)\n\n7. Create documentation:\n   File: docs/LOGGING.md\n   - How logging works in this application\n   - Log levels and when to use them (error, warn, info, debug)\n   - How to view logs locally (pino-pretty output)\n   - How to view logs in production (file-based or log aggregation)\n   - Optional: Setting up BetterStack/LogTail (free tier)\n   - Optional: Setting up Papertrail (free tier)\n   - How to search and filter logs\n   - Best practices for logging (what to log, what not to log)\n   - Understanding log context and correlation IDs\n\n8. Update DEPLOYMENT.md:\n   - Add logging section with instructions for viewing logs in production\n   - Document free log aggregation options (BetterStack, Papertrail, file-based)\n\nIMPORTANT:\n- Pino is 100% FREE and one of the fastest Node.js loggers\n- BetterStack/LogTail free tier: 1GB/month (enough for hobby projects)\n- Papertrail free tier: 50MB/day (plenty for small apps)\n- File-based logging is completely free (requires log rotation)\n- Do NOT log passwords, credit cards, or sensitive data\n- Structured logging (JSON) makes it easy to search and filter\n\nLocation: apps/web/",
       "verification": {
         "commands": [
-          "# Set SENTRY_DSN in .env to test project DSN",
-          "# Trigger a test error",
-          "# Verify error appears in Sentry dashboard"
+          "cd apps/web",
+          "# Start dev server and verify pretty logs appear",
+          "npm run dev",
+          "# Trigger a test error and verify it's logged with context",
+          "# Make API requests and verify request/response logging"
         ],
-        "expectedOutcome": "Errors are captured in Sentry, user context included"
+        "expectedOutcome": "Errors are logged with context, pretty output in dev, JSON in production"
       },
       "deliverables": [
-        "src/utils/sentry.ts",
-        "__create/index.ts (updated)",
-        "src/entry.client.tsx (updated)",
-        "docs/ERROR_TRACKING.md",
-        ".env.example (updated)",
-        "DEPLOYMENT.md (updated)",
+        "src/utils/logger.ts",
+        "__create/index.ts (updated with Pino)",
+        "src/entry.client.tsx (updated with error boundary)",
+        "docs/LOGGING.md",
+        ".env.example (updated with LOG_LEVEL)",
+        "DEPLOYMENT.md (updated with logging section)",
         "package.json (dependencies updated)"
       ]
     },
@@ -400,7 +406,7 @@
       "Pre-commit hooks functioning",
       "Build succeeds",
       "CI/CD pipeline green",
-      "Error tracking configured",
+      "Error tracking and logging configured",
       "Documentation updated"
     ]
   },

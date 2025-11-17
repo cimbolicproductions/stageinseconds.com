@@ -1,0 +1,54 @@
+version: 2
+updates:
+  # Enable version updates for npm dependencies in apps/web
+  - package-ecosystem: "npm"
+    directory: "/apps/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    # Group non-security updates to reduce PR noise
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+    # Allow up to 5 open pull requests for npm dependencies
+    open-pull-requests-limit: 5
+    # Add reviewers (optional - uncomment and customize)
+    # reviewers:
+    #   - "your-github-username"
+    # Add labels to PRs
+    labels:
+      - "dependencies"
+      - "automated"
+    # Prefix commit messages
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    # Security updates are always created immediately, regardless of schedule
+    # Increase version requirement only if required
+    versioning-strategy: increase-if-necessary
+
+  # Monitor GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "ci"

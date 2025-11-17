@@ -13,11 +13,32 @@ import { requestId } from 'hono/request-id';
 import { createHonoServer } from 'react-router-hono-server/node';
 import { serializeError } from 'serialize-error';
 import ws from 'ws';
+import pinoHttp from 'pino-http';
 import NeonAdapter from './adapter';
 import { getHTMLForErrorPage } from './get-html-for-error-page';
 import { isAuthAction } from './is-auth-action';
 import { API_BASENAME, api } from './route-builder';
+import logger, { logError } from '../src/utils/logger';
 neonConfig.webSocketConstructor = ws;
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  logger.error({
+    err: reason instanceof Error ? reason : new Error(String(reason)),
+    promise: String(promise),
+  }, 'Unhandled promise rejection');
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+  logger.fatal({
+    err: error,
+  }, 'Uncaught exception');
+  // Give the logger time to flush before exiting
+  setTimeout(() => {
+    process.exit(1);
+  }, 1000);
+});
 
 const als = new AsyncLocalStorage<{ requestId: string }>();
 
@@ -50,7 +71,37 @@ app.use('*', (c, next) => {
 
 app.use(contextStorage());
 
+// Add Pino HTTP logging middleware
+app.use('*', async (c, next) => {
+  const startTime = Date.now();
+  const requestId = c.get('requestId');
+
+  await next();
+
+  const duration = Date.now() - startTime;
+  const statusCode = c.res.status;
+
+  logger.info({
+    requestId,
+    method: c.req.method,
+    path: c.req.path,
+    statusCode,
+    duration,
+    userAgent: c.req.header('user-agent'),
+  }, `${c.req.method} ${c.req.path} ${statusCode} ${duration}ms`);
+});
+
 app.onError((err, c) => {
+  const requestId = c.get('requestId');
+
+  // Log the error with context
+  logError(err, {
+    requestId,
+    path: c.req.path,
+    method: c.req.method,
+    statusCode: 500,
+  });
+
   if (c.req.method !== 'GET') {
     return c.json(
       {

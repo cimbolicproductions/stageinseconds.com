@@ -332,6 +332,8 @@ After your first deployment, configure Stripe to send webhooks to your app:
 | `NEXT_PUBLIC_APP_URL` | Your domain (auto-set by Vercel) | No |
 | `CORS_ORIGINS` | Comma-separated allowed origins | No |
 | `NODE_ENV` | Auto-set to `production` by Vercel | Auto |
+| `LOG_LEVEL` | Log level: trace, debug, info, warn, error, fatal (default: info) | No |
+| `LOGTAIL_TOKEN` | LogTail/BetterStack source token (optional, free tier available) | No |
 
 ### Setting Environment Variables
 
@@ -534,37 +536,62 @@ psql $DATABASE_URL < backup-20250108.sql
    - High connection count (> 80% of pool)
    - Compute hours approaching quota
 
-### External Monitoring (Recommended)
+### Logging (Built-in with Pino)
 
-#### Error Tracking: Sentry
+The application includes built-in logging with Pino for structured logging and error tracking.
 
-1. Sign up at https://sentry.io
-2. Create new project: "stageinseconds"
-3. Install SDK:
-   ```bash
-   npm install @sentry/node @sentry/react
-   ```
+**Viewing Logs in Production**:
 
-4. Configure in `apps/web/__create/index.ts`:
-   ```typescript
-   import * as Sentry from '@sentry/node'
+1. **Vercel Logs** (built-in, free):
+   - Vercel Dashboard → Your Project → **Logs**
+   - View real-time JSON logs
+   - Filter by status code, function, time
+   - Search for errors: filter by "level:50" (error) or "level:60" (fatal)
 
-   if (process.env.NODE_ENV === 'production') {
-     Sentry.init({
-       dsn: process.env.SENTRY_DSN,
-       environment: 'production',
-       tracesSampleRate: 0.1,
-     })
-   }
-   ```
+2. **LogTail/BetterStack** (optional, free tier):
+   - Sign up at https://betterstack.com/logs or https://logtail.com
+   - Create a source and copy the source token
+   - Add `LOGTAIL_TOKEN` to Vercel environment variables
+   - Logs will stream to LogTail dashboard with advanced search and filtering
+   - Free tier: 1GB/month, 3-day retention
 
-5. Add `SENTRY_DSN` to Vercel environment variables
+3. **Papertrail** (alternative, free tier):
+   - Sign up at https://papertrailapp.com
+   - Free tier: 50MB/day, 48-hour search
+   - Configure Pino transport (see [LOGGING.md](./docs/LOGGING.md))
 
-**Benefits**:
-- Error grouping and trends
-- Stack traces with source maps
-- User context (which users hit errors)
-- Email/Slack alerts
+**Log Structure**:
+All logs include context for easy filtering:
+- `requestId`: Unique ID for request tracing
+- `userId`: Authenticated user ID
+- `method`, `path`: HTTP request details
+- `statusCode`, `duration`: Response metrics
+- `err.message`, `err.stack`: Error details
+
+**Searching Logs**:
+```
+# Find all errors for a user
+userId = "user_123" AND level >= 50
+
+# Find slow requests
+duration > 1000
+
+# Find payment events
+event = "checkout_session_created"
+
+# Trace a request
+requestId = "abc123"
+```
+
+For detailed logging documentation, see [docs/LOGGING.md](./docs/LOGGING.md).
+
+### External Monitoring (Optional)
+
+#### Error Tracking: Alternative to Built-in Logging
+
+If you need more advanced error tracking beyond Pino, consider Sentry (paid service, $26/month after trial).
+
+The application already includes comprehensive error logging with Pino. Sentry provides additional features like error grouping, release tracking, and performance monitoring.
 
 #### Uptime Monitoring: UptimeRobot
 

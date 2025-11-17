@@ -25,7 +25,14 @@
       "Bash(npm run lint:*)",
       "Bash(npm run test:integration:*)",
       "Bash(npm run dev:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git push:*)",
+      "Bash(mkdir:*)",
+      "Bash(done)",
+      "Bash(npm run build:*)",
+      "Bash(npm run:*)",
+      "Bash(node test-logger.js:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import { logError, logEvent } from '@/app/api/utils/logger.js'
 
 const STRIPE_API = 'https://api.stripe.com/v1'
 
@@ -25,8 +26,9 @@ async function stripeFetch(path, options = {}) {
 }
 
 export async function POST(request) {
+  let session
   try {
-    const session = await auth()
+    session = await auth()
     if (!session?.user?.id || !session?.user?.email) {
       return Response.json({ error: 'Sign in required' }, { status: 401 })
     }
@@ -109,9 +111,21 @@ export async function POST(request) {
     }
     const checkout = await checkoutRes.json()
 
+    logEvent('checkout_session_created', request, {
+      userId: session.user.id,
+      email: session.user.email,
+      lookupKey,
+      quantity: qty,
+      stripeSessionId: checkout.id,
+    })
+
     return Response.json({ url: checkout.url, id: checkout.id })
   } catch (e) {
-    console.error('create-checkout error', e)
+    logError(e, request, {
+      apiRoute: 'create-checkout',
+      userId: session?.user?.id,
+      statusCode: 500,
+    })
     return Response.json({ error: e?.message || String(e) }, { status: 500 })
   }
 }
