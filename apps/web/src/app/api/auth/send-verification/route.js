@@ -1,4 +1,5 @@
 import sql from '@/app/api/utils/sql'
+import { SendVerificationSchema } from '@/schemas/api'
 import { logError, logEvent, logWarn } from '@/app/api/utils/logger.js'
 
 function generateToken() {
@@ -6,7 +7,9 @@ function generateToken() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID().replace(/-/g, '')
     }
-  } catch (_) {}
+  } catch {
+    // Fallback to Math.random if crypto not available
+  }
   return (
     Math.random().toString(36).slice(2) +
     Date.now().toString(36) +
@@ -43,10 +46,23 @@ export async function POST(request) {
   let body
   try {
     body = await request.json().catch(() => ({}))
-    const email = (body.email || '').toLowerCase().trim()
-    if (!email) {
-      return Response.json({ error: 'Email is required' }, { status: 400 })
+
+    // Validate input using Zod schema
+    const validation = SendVerificationSchema.safeParse(body)
+    if (!validation.success) {
+      return Response.json(
+        {
+          error: 'Validation failed',
+          details: validation.error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
+        { status: 400 }
+      )
     }
+
+    const { email } = validation.data
 
     // NEW: fail fast if email provider is not configured to avoid silent success
     if (!process.env.RESEND_API_KEY) {

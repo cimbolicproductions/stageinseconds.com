@@ -1,0 +1,576 @@
+{
+  "task": "Task 8: Add Request Validation Middleware",
+  "context": {
+    "project": "stageinseconds.com",
+    "previousProgress": {
+      "task-1": "completed - ESLint, Prettier, and pre-commit hooks configured",
+      "task-2": "completed - Database migrations with Drizzle ORM",
+      "task-3": "completed - Unit tests for validators, auth, and SSRF protection",
+      "task-4-part-1": "completed - Integration test infrastructure (db helpers, api helpers, MSW mocks)",
+      "task-4-part-2": "completed - Auth integration tests (16 tests, skipped)",
+      "task-4-part-3": "completed - Billing integration tests (29 tests, skipped)",
+      "task-4-part-4": "completed - Photo processing integration tests (39 tests, skipped)",
+      "task-4-part-5": "completed - Job management integration tests (20 tests, skipped) + DELETE endpoint",
+      "task-5": "completed - CI/CD pipeline with GitHub Actions (test, security, deploy workflows)",
+      "task-6": "completed - Error tracking and logging with Pino logger",
+      "task-7": "completed - Rate limiting middleware with tiered limits and comprehensive tests"
+    },
+    "currentTask": "task-8",
+    "status": "not started",
+    "totalTestCount": "104 tests (16 auth + 29 billing + 39 photo processing + 20 job management) + 9 rate limiting",
+    "versionControl": {
+      "repository": "https://github.com/cimbolicproductions/stageinseconds.com",
+      "setupDate": "2025-11-17",
+      "commits": [
+        {
+          "hash": "9616dcd",
+          "message": "Add ESLint and Prettier with pre-commit hooks",
+          "task": "task-1"
+        },
+        {
+          "hash": "ca27857",
+          "message": "Complete Tasks 2-4: Database migrations, testing infrastructure, and comprehensive test suite",
+          "tasks": ["task-2", "task-3", "task-4-part-1", "task-4-part-2", "task-4-part-3", "task-4-part-4", "task-4-part-5"]
+        },
+        {
+          "hash": "a049b18",
+          "message": "Add comprehensive error tracking and logging system with Pino",
+          "task": "task-6"
+        },
+        {
+          "hash": "a998808",
+          "message": "Add comprehensive rate limiting for API security",
+          "task": "task-7"
+        }
+      ]
+    }
+  },
+  "objective": "Add centralized request validation middleware using Zod schemas to replace scattered validation logic throughout API routes. This will improve type safety, reduce code duplication, provide better error messages, and make the codebase more maintainable.",
+  "requirements": {
+    "dependencies": {
+      "install": [
+        "zod - TypeScript-first schema validation library",
+        "@hono/zod-validator - Hono middleware for Zod validation"
+      ],
+      "notes": [
+        "Zod provides runtime type safety with TypeScript inference",
+        "@hono/zod-validator integrates Zod seamlessly with Hono framework",
+        "Zero dependencies, works in all JavaScript environments"
+      ]
+    },
+    "zodSchemas": {
+      "file": "apps/web/src/schemas/api.ts",
+      "schemas": [
+        {
+          "name": "ProcessPhotosSchema",
+          "description": "Validates photo processing requests",
+          "fields": {
+            "fileUrls": {
+              "type": "array of strings",
+              "validation": [
+                "Array of 1-30 URLs",
+                "Each URL must be HTTPS (not HTTP)",
+                "No localhost, 127.0.0.1, or 0.0.0.0",
+                "No private IP ranges (10.x, 192.168.x, 172.16-31.x)",
+                "Valid URL format",
+                "No data: or file: URIs"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "validation": [
+                "Non-empty string",
+                "Max length: 500 characters (recommended)",
+                "Trimmed (no leading/trailing whitespace)"
+              ]
+            }
+          },
+          "errorMessages": "Should include which URL failed validation and why"
+        },
+        {
+          "name": "UpdateJobSchema",
+          "description": "Validates job update requests",
+          "fields": {
+            "groupName": {
+              "type": "string",
+              "validation": [
+                "Max length: 140 characters",
+                "Optional (can be omitted)",
+                "If provided, must be a string"
+              ]
+            }
+          }
+        },
+        {
+          "name": "CreateCheckoutSchema",
+          "description": "Validates Stripe checkout creation",
+          "fields": {
+            "lookupKey": {
+              "type": "string",
+              "validation": [
+                "Required",
+                "Non-empty string",
+                "One of: PAYG_IMAGE_CREDIT, PACK_20_CREDITS, PACK_50_CREDITS, PACK_100_CREDITS"
+              ]
+            },
+            "quantity": {
+              "type": "number",
+              "validation": [
+                "Positive integer",
+                "Default: 1",
+                "Min: 1, Max: 100"
+              ]
+            },
+            "redirectURL": {
+              "type": "string",
+              "validation": [
+                "Optional",
+                "Valid URL format if provided",
+                "Default: /upload"
+              ]
+            }
+          }
+        },
+        {
+          "name": "SignUpSchema",
+          "description": "Validates user signup",
+          "fields": {
+            "email": {
+              "type": "string",
+              "validation": [
+                "Required",
+                "Valid email format",
+                "Lowercase normalized"
+              ]
+            },
+            "password": {
+              "type": "string",
+              "validation": [
+                "Required",
+                "Min length: 8 characters",
+                "Should not be overly restrictive (allow various formats)"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "validation": [
+                "Optional",
+                "Max length: 100 characters"
+              ]
+            }
+          }
+        },
+        {
+          "name": "SignInSchema",
+          "description": "Validates user signin",
+          "fields": {
+            "email": {
+              "type": "string",
+              "validation": [
+                "Required",
+                "Valid email format"
+              ]
+            },
+            "password": {
+              "type": "string",
+              "validation": [
+                "Required",
+                "Non-empty string"
+              ]
+            }
+          }
+        }
+      ],
+      "helperFunctions": [
+        {
+          "name": "isPrivateIP",
+          "purpose": "Check if hostname is a private IP address",
+          "returns": "boolean",
+          "use": "Used in ProcessPhotosSchema for SSRF protection"
+        },
+        {
+          "name": "isSafeUrl",
+          "purpose": "Comprehensive URL safety check (HTTPS, no private IPs, no localhost)",
+          "returns": "boolean",
+          "use": "Used in ProcessPhotosSchema for SSRF protection"
+        }
+      ],
+      "notes": [
+        "Reuse validation logic from src/utils/validators.ts where possible",
+        "All schemas should export TypeScript types for use in route handlers",
+        "Use z.infer<typeof SchemaName> for type inference",
+        "Provide custom error messages for better UX"
+      ]
+    },
+    "validationMiddleware": {
+      "file": "apps/web/src/middleware/validate.ts",
+      "approach": "Use @hono/zod-validator for seamless Hono integration",
+      "implementation": {
+        "method": "Use zValidator middleware from @hono/zod-validator",
+        "usage": "app.post('/api/endpoint', zValidator('json', SchemaName), handler)",
+        "errorHandling": [
+          "Return 400 status code on validation failure",
+          "Include detailed error messages from Zod",
+          "Format errors in user-friendly way",
+          "Include which field failed and why"
+        ],
+        "responseFormat": {
+          "statusCode": 400,
+          "body": {
+            "error": "Validation failed",
+            "details": [
+              {
+                "field": "fileUrls[0]",
+                "message": "URL must use HTTPS protocol"
+              },
+              {
+                "field": "prompt",
+                "message": "Prompt is required"
+              }
+            ]
+          }
+        }
+      },
+      "notes": [
+        "@hono/zod-validator handles all middleware creation",
+        "No need to create custom validation middleware",
+        "Type-safe request body automatically inferred",
+        "Middleware already formats Zod errors nicely"
+      ]
+    },
+    "apiRouteUpdates": {
+      "routes": [
+        {
+          "file": "apps/web/src/app/api/process-photos/route.js",
+          "endpoint": "POST /api/process-photos",
+          "changes": [
+            "Import ProcessPhotosSchema from schemas/api.ts",
+            "Import zValidator from @hono/zod-validator",
+            "Add zValidator('json', ProcessPhotosSchema) middleware",
+            "Remove manual validation code (URL checks, array length, etc.)",
+            "Use validated data from c.req.valid('json')",
+            "Keep business logic unchanged"
+          ],
+          "before": "640 lines with scattered validation",
+          "after": "~580 lines with centralized validation"
+        },
+        {
+          "file": "apps/web/src/app/api/jobs/[id]/route.js",
+          "endpoint": "PATCH /api/jobs/[id]",
+          "changes": [
+            "Import UpdateJobSchema from schemas/api.ts",
+            "Import zValidator from @hono/zod-validator",
+            "Add zValidator('json', UpdateJobSchema) middleware",
+            "Remove manual groupName length check",
+            "Use validated data from c.req.valid('json')"
+          ]
+        },
+        {
+          "file": "apps/web/src/app/api/billing/create-checkout/route.js",
+          "endpoint": "POST /api/billing/create-checkout",
+          "changes": [
+            "Import CreateCheckoutSchema from schemas/api.ts",
+            "Import zValidator from @hono/zod-validator",
+            "Add zValidator('json', CreateCheckoutSchema) middleware",
+            "Remove manual validation of lookupKey and quantity",
+            "Use validated data from c.req.valid('json')"
+          ]
+        }
+      ],
+      "notes": [
+        "DO NOT change authentication/authorization logic",
+        "DO NOT change business logic or database queries",
+        "ONLY replace validation code with Zod schemas",
+        "Test thoroughly after each route update",
+        "Existing integration tests should still pass (they test the same validations)"
+      ]
+    },
+    "testing": {
+      "file": "test/middleware/validate.test.ts",
+      "testCases": [
+        {
+          "category": "ProcessPhotosSchema Validation",
+          "tests": [
+            "Should accept valid HTTPS URLs with valid prompt",
+            "Should reject HTTP URLs (only HTTPS allowed)",
+            "Should reject localhost URLs (127.0.0.1, localhost, 0.0.0.0)",
+            "Should reject private IP addresses (10.x, 192.168.x, 172.16-31.x)",
+            "Should reject empty fileUrls array",
+            "Should reject more than 30 URLs",
+            "Should reject data: URIs",
+            "Should reject file:// URIs",
+            "Should reject empty prompt",
+            "Should reject missing prompt",
+            "Should trim whitespace from prompt",
+            "Should reject fileUrls that is not an array"
+          ]
+        },
+        {
+          "category": "UpdateJobSchema Validation",
+          "tests": [
+            "Should accept valid groupName (max 140 chars)",
+            "Should reject groupName longer than 140 characters",
+            "Should accept missing groupName (optional field)",
+            "Should reject non-string groupName"
+          ]
+        },
+        {
+          "category": "CreateCheckoutSchema Validation",
+          "tests": [
+            "Should accept valid lookupKey and quantity",
+            "Should reject invalid lookupKey (not in enum)",
+            "Should reject missing lookupKey",
+            "Should default quantity to 1 if not provided",
+            "Should reject negative quantity",
+            "Should reject quantity > 100",
+            "Should accept optional redirectURL",
+            "Should validate redirectURL format if provided"
+          ]
+        },
+        {
+          "category": "SignUpSchema Validation",
+          "tests": [
+            "Should accept valid email and password",
+            "Should reject invalid email format",
+            "Should reject password < 8 characters",
+            "Should accept optional name field",
+            "Should reject name > 100 characters",
+            "Should normalize email to lowercase"
+          ]
+        },
+        {
+          "category": "SignInSchema Validation",
+          "tests": [
+            "Should accept valid email and password",
+            "Should reject invalid email format",
+            "Should reject missing email",
+            "Should reject missing password"
+          ]
+        },
+        {
+          "category": "Error Messages",
+          "tests": [
+            "Should return 400 status code on validation failure",
+            "Should include error details in response",
+            "Should specify which field failed validation",
+            "Should provide clear error message for user"
+          ]
+        }
+      ],
+      "mockSetup": [
+        "Use Hono test client to make requests",
+        "Test validation without hitting actual routes",
+        "Mock route handlers to test middleware in isolation",
+        "Verify error response format matches expected structure"
+      ],
+      "totalTests": "~35 tests covering all schemas and edge cases"
+    },
+    "documentation": {
+      "updates": [
+        {
+          "file": "API_DOCUMENTATION.md",
+          "section": "Request Validation",
+          "content": [
+            "Add new section explaining request validation with Zod",
+            "Document validation error response format",
+            "Show example validation error responses",
+            "Link to Zod documentation for schema details"
+          ]
+        },
+        {
+          "file": "README.md",
+          "section": "Development",
+          "content": [
+            "Add note about Zod schemas for request validation",
+            "Explain where to find schemas (src/schemas/api.ts)",
+            "Mention type safety benefits"
+          ]
+        }
+      ]
+    }
+  },
+  "technicalDetails": {
+    "zodFeatures": {
+      "typeInference": {
+        "description": "Zod schemas automatically infer TypeScript types",
+        "usage": "type ProcessPhotosInput = z.infer<typeof ProcessPhotosSchema>",
+        "benefit": "No need to maintain separate types and validation"
+      },
+      "customValidation": {
+        "description": "Zod supports custom validation with .refine()",
+        "usage": "z.string().refine(isSafeUrl, { message: 'URL not safe' })",
+        "benefit": "Reuse existing validation functions (isSafeUrl, isPrivateIP)"
+      },
+      "transformations": {
+        "description": "Zod can transform data during validation",
+        "usage": "z.string().email().toLowerCase().trim()",
+        "benefit": "Normalize data automatically (e.g., lowercase emails)"
+      },
+      "errorHandling": {
+        "description": "Zod provides detailed error information",
+        "usage": "error.issues.map(i => ({ field: i.path, message: i.message }))",
+        "benefit": "Clear, actionable error messages for users"
+      }
+    },
+    "honoIntegration": {
+      "middleware": "@hono/zod-validator provides zValidator middleware",
+      "usage": "app.post('/api/endpoint', zValidator('json', Schema), handler)",
+      "validation": "Validates request body automatically before handler",
+      "typeSafety": "Request body is fully type-safe in handler (c.req.valid('json'))",
+      "errorResponse": "Automatically returns 400 with Zod errors on validation failure"
+    },
+    "ssrfProtection": {
+      "current": "Manual URL validation in process-photos route",
+      "new": "Centralized in ProcessPhotosSchema with .refine()",
+      "validation": [
+        "HTTPS-only URLs (no HTTP)",
+        "No localhost (localhost, 127.0.0.1, 0.0.0.0)",
+        "No private IPs (10.x, 192.168.x, 172.16-31.x)",
+        "No data: or file: URIs",
+        "Valid URL format"
+      ],
+      "benefits": [
+        "Validation happens before handler logic",
+        "Same protection, cleaner code",
+        "Easier to test and maintain"
+      ]
+    }
+  },
+  "implementation": {
+    "steps": [
+      {
+        "step": 1,
+        "task": "Install dependencies",
+        "commands": [
+          "cd apps/web",
+          "npm install zod @hono/zod-validator"
+        ]
+      },
+      {
+        "step": 2,
+        "task": "Create Zod schemas",
+        "file": "apps/web/src/schemas/api.ts",
+        "details": [
+          "Import existing validation helpers from utils/validators.ts",
+          "Create all 5 schemas (ProcessPhotos, UpdateJob, CreateCheckout, SignUp, SignIn)",
+          "Export schemas and inferred types",
+          "Use custom validation (.refine) for SSRF protection",
+          "Add descriptive error messages for all validations"
+        ]
+      },
+      {
+        "step": 3,
+        "task": "Update API routes to use Zod validation",
+        "routes": [
+          "apps/web/src/app/api/process-photos/route.js",
+          "apps/web/src/app/api/jobs/[id]/route.js",
+          "apps/web/src/app/api/billing/create-checkout/route.js"
+        ],
+        "details": [
+          "Import zValidator and schema",
+          "Add zValidator middleware to route",
+          "Replace manual validation with c.req.valid('json')",
+          "Remove redundant validation code",
+          "Keep all business logic unchanged"
+        ]
+      },
+      {
+        "step": 4,
+        "task": "Create validation tests",
+        "file": "test/middleware/validate.test.ts",
+        "details": [
+          "Test all schemas with valid inputs",
+          "Test all schemas with invalid inputs",
+          "Test error message format",
+          "Test edge cases (empty arrays, null values, etc.)",
+          "~35 comprehensive tests"
+        ]
+      },
+      {
+        "step": 5,
+        "task": "Update documentation",
+        "files": [
+          "API_DOCUMENTATION.md",
+          "README.md"
+        ],
+        "details": [
+          "Add Request Validation section to API docs",
+          "Document validation error format",
+          "Add development notes to README"
+        ]
+      },
+      {
+        "step": 6,
+        "task": "Run existing integration tests",
+        "commands": [
+          "npm run test:integration"
+        ],
+        "details": [
+          "Verify existing tests still pass",
+          "Integration tests validate the same things, should work unchanged",
+          "If tests fail, validation might be too strict (adjust schemas)"
+        ]
+      }
+    ]
+  },
+  "verification": {
+    "local": [
+      "Run validation tests: npm run test -- test/middleware/validate",
+      "Run integration tests: npm run test:integration",
+      "Start dev server: npm run dev",
+      "Test /api/process-photos with invalid URL (should get 400 with error details)",
+      "Test /api/process-photos with valid data (should work as before)",
+      "Test /api/jobs/[id] with groupName > 140 chars (should get 400)",
+      "Verify error messages are clear and helpful"
+    ],
+    "successCriteria": [
+      "All validation tests pass (~35 tests)",
+      "All existing integration tests still pass (104 tests)",
+      "API routes return 400 with detailed errors on invalid input",
+      "Valid requests work exactly as before",
+      "Code is cleaner (less validation boilerplate)",
+      "Type safety improved (TypeScript infers validated types)"
+    ]
+  },
+  "deliverables": [
+    "src/schemas/api.ts - All Zod schemas with exports",
+    "apps/web/src/app/api/process-photos/route.js - Updated with Zod validation",
+    "apps/web/src/app/api/jobs/[id]/route.js - Updated with Zod validation",
+    "apps/web/src/app/api/billing/create-checkout/route.js - Updated with Zod validation",
+    "test/middleware/validate.test.ts - Comprehensive validation tests (~35 tests)",
+    "API_DOCUMENTATION.md - Updated with validation section",
+    "README.md - Updated with Zod notes",
+    "package.json - Dependencies updated (zod, @hono/zod-validator)"
+  ],
+  "notes": [
+    "Zod provides better type safety than manual validation",
+    "Validation errors are more user-friendly with Zod",
+    "Code becomes more maintainable (centralized validation)",
+    "Reduces code duplication across routes",
+    "@hono/zod-validator handles all middleware complexity",
+    "Existing integration tests validate the same rules, should still pass",
+    "SSRF protection remains unchanged, just moved to schemas",
+    "This is a refactoring task - behavior should be identical",
+    "Focus on DRY principle: Don't Repeat Yourself"
+  ],
+  "bestPractices": [
+    "Keep schemas in separate file (src/schemas/api.ts) for reusability",
+    "Export both schemas and inferred types for use in handlers",
+    "Use descriptive error messages in schema definitions",
+    "Reuse existing validation functions (isSafeUrl, isPrivateIP)",
+    "Test schemas independently from routes",
+    "Don't change business logic when adding validation",
+    "Use .transform() for data normalization (lowercase emails, trim strings)",
+    "Use .default() for optional fields with defaults (quantity: 1)",
+    "Use .refine() for custom validation logic (SSRF protection)"
+  ],
+  "futureEnhancements": [
+    "Add Zod schemas for authentication routes (signin, signup)",
+    "Add Zod schemas for user profile updates",
+    "Add Zod schemas for admin endpoints",
+    "Generate OpenAPI/Swagger docs from Zod schemas (zod-to-openapi)",
+    "Add response validation (validate API responses match expected schema)",
+    "Add query parameter validation (for GET endpoints)"
+  ],
+  "instruction": "Please complete Task 8: Add request validation middleware using Zod schemas. Install Zod and @hono/zod-validator, create schemas for all API endpoints, update routes to use Zod validation, add comprehensive tests, and update documentation. Ensure all existing tests still pass and behavior remains unchanged."
+}

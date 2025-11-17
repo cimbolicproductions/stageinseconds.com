@@ -12,6 +12,7 @@ This document provides comprehensive documentation for all API endpoints in the 
 - [Overview](#overview)
 - [Authentication](#authentication)
 - [Error Handling](#error-handling)
+- [Request Validation](#request-validation)
 - [Rate Limiting](#rate-limiting)
 - [Endpoints](#endpoints)
   - [Authentication](#authentication-endpoints)
@@ -81,6 +82,7 @@ Routes requiring authentication return `401 Unauthorized` if no valid session ex
 | 401 | Unauthorized | Authentication required |
 | 403 | Forbidden | Authenticated but not authorized |
 | 404 | Not Found | Resource doesn't exist |
+| 429 | Too Many Requests | Rate limit exceeded |
 | 500 | Internal Server Error | Server-side error |
 | 502 | Bad Gateway | External service (AI, Stripe) failed |
 
@@ -92,6 +94,73 @@ Routes requiring authentication return `401 Unauthorized` if no valid session ex
   "details": "Optional additional context"
 }
 ```
+
+---
+
+## Request Validation
+
+All API endpoints use **Zod** for type-safe request validation. Invalid requests receive a `400 Bad Request` response with detailed field-level error information.
+
+### Validation Error Response
+
+When a request fails validation, the API returns:
+
+**Status Code**: `400 Bad Request`
+
+**Response Body**:
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "email",
+      "message": "Invalid email address"
+    },
+    {
+      "field": "password",
+      "message": "Password must be at least 8 characters"
+    }
+  ]
+}
+```
+
+### Common Validation Rules
+
+#### Email Validation
+- Must be a valid email format
+- Maximum 255 characters
+- Automatically converted to lowercase
+- Leading/trailing whitespace not allowed
+
+#### Password Validation (Sign Up)
+- Minimum 8 characters
+- Maximum 128 characters
+- Must contain at least one uppercase letter
+- Must contain at least one lowercase letter
+- Must contain at least one number
+
+#### Password Validation (Sign In)
+- Minimum 1 character (any password)
+- Maximum 128 characters
+
+#### URL Validation (File URLs)
+- Must use HTTPS protocol only (HTTP rejected)
+- Must not point to private/internal resources (SSRF protection):
+  - No localhost, 127.0.0.1, 0.0.0.0, ::1
+  - No private IP ranges (10.x.x.x, 192.168.x.x, 172.16-31.x.x)
+  - No cloud metadata endpoints (169.254.169.254)
+
+#### Array Validation (File URLs)
+- Minimum 1 item required
+- Maximum 30 items allowed
+
+#### String Length Validation
+- **Prompt**: Maximum 500 characters (optional)
+- **Group Name**: Maximum 140 characters (optional)
+- **Name**: Maximum 100 characters (optional)
+
+#### Number Validation
+- **Quantity** (billing): Integer, 1-500 range
 
 ---
 

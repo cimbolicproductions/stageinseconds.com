@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import { CreateCheckoutSchema } from '@/schemas/api'
 import { logError, logEvent } from '@/app/api/utils/logger.js'
 
 const STRIPE_API = 'https://api.stripe.com/v1'
@@ -33,10 +34,24 @@ export async function POST(request) {
       return Response.json({ error: 'Sign in required' }, { status: 401 })
     }
 
-    const { lookupKey, quantity = 1, redirectURL } = await request.json()
-    if (!lookupKey) {
-      return Response.json({ error: 'lookupKey is required' }, { status: 400 })
+    const body = await request.json()
+
+    // Validate input using Zod schema
+    const validation = CreateCheckoutSchema.safeParse(body)
+    if (!validation.success) {
+      return Response.json(
+        {
+          error: 'Validation failed',
+          details: validation.error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
+        { status: 400 }
+      )
     }
+
+    const { lookupKey, quantity, redirectURL } = validation.data
 
     // Get price by lookup key
     const pricesRes = await stripeFetch(
@@ -83,14 +98,11 @@ export async function POST(request) {
     const successUrl = `${successUrlAbs}${successUrlAbs.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = toAbsolute(redirectURL) || successUrlAbs
 
-    // SECURITY: clamp quantity to reasonable bounds
-    const qty = Math.min(500, Math.max(1, Number(quantity) || 1))
-
-    // Create checkout session
-    const body = formBody({
+    // Create checkout session (quantity already validated by Zod)
+    const requestBody = formBody({
       mode: 'payment',
       'line_items[0][price]': price.id,
-      'line_items[0][quantity]': String(qty),
+      'line_items[0][quantity]': String(quantity),
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer_email: session.user.email,
@@ -100,7 +112,7 @@ export async function POST(request) {
 
     const checkoutRes = await stripeFetch(`/checkout/sessions`, {
       method: 'POST',
-      body,
+      body: requestBody,
     })
     if (!checkoutRes.ok) {
       const t = await checkoutRes.text()
@@ -115,7 +127,7 @@ export async function POST(request) {
       userId: session.user.id,
       email: session.user.email,
       lookupKey,
-      quantity: qty,
+      quantity,
       stripeSessionId: checkout.id,
     })
 

@@ -1,29 +1,31 @@
 import sql from '@/app/api/utils/sql'
 import upload from '@/app/api/utils/upload' // NEW: use platform uploader to store generated files (zip)
 import { auth } from '@/auth' // Enforce sign-in and track credits
-import { validateFileUrls, validatePrompt } from '@/utils/validators'
+import { ProcessPhotosSchema } from '@/schemas/api'
 import { logError, logEvent } from '@/app/api/utils/logger.js'
 
 export async function POST(request) {
   let session
   try {
     const body = await request.json()
-    const { fileUrls, prompt, fileCount } = body
 
-    // Validate input using centralized validation functions
-    try {
-      validateFileUrls(fileUrls)
-      validatePrompt(prompt)
-    } catch (error) {
-      return Response.json({ error: error.message }, { status: 400 })
-    }
-
-    if (!fileCount || fileCount <= 0 || fileCount > 30) {
+    // Validate input using Zod schema
+    const validation = ProcessPhotosSchema.safeParse(body)
+    if (!validation.success) {
       return Response.json(
-        { error: 'File count must be between 1 and 30' },
+        {
+          error: 'Validation failed',
+          details: validation.error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
         { status: 400 }
       )
     }
+
+    const { fileUrls, prompt, groupName } = validation.data
+    const fileCount = fileUrls.length
 
     // Enforce authentication (trial requires sign-in)
     session = await auth()
@@ -84,9 +86,9 @@ export async function POST(request) {
     if (hasDB) {
       // ADD: persist user_id with the job so dashboard can filter by user
       const jobResult = await sql`
-        INSERT INTO photo_jobs (user_id, prompt, photo_count, cost, status)
-        VALUES (${userId}, ${prompt.trim()}, ${fileCount}, ${cost}, 'processing')
-        RETURNING id, prompt, photo_count, cost, status, created_at
+        INSERT INTO photo_jobs (user_id, prompt, photo_count, cost, status, group_name)
+        VALUES (${userId}, ${prompt?.trim() || ''}, ${fileCount}, ${cost}, 'processing', ${groupName || null})
+        RETURNING id, prompt, photo_count, cost, status, created_at, group_name
       `
       job = jobResult[0]
     }

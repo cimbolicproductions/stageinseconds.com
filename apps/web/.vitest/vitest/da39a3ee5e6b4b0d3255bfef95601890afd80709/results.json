@@ -3,16 +3,13 @@
   "results": [
     [
       ":test/security/ssrf.test.ts",
-      { "duration": 23.158300000000054, "failed": false }
+      { "duration": 10983.256800000001, "failed": false }
     ],
     [
       ":test/utils/validation.test.ts",
-      { "duration": 29.831700000000183, "failed": false }
+      { "duration": 13374.897699999998, "failed": false }
     ],
-    [
-      ":test/auth/password.test.ts",
-      { "duration": 1241.5367999999999, "failed": false }
-    ],
+    [":test/auth/password.test.ts", { "duration": 6186.9715, "failed": false }],
     [":test/api/auth.test.ts", { "duration": 0, "failed": false }],
     [":test/api/billing.test.ts", { "duration": 0, "failed": false }],
     [":test/api/process-photos.test.ts", { "duration": 0, "failed": false }],
@@ -24,6 +21,7 @@
     [
       ":test/middleware/rateLimit.simple.test.ts",
       { "duration": 3704.8422000000005, "failed": true }
-    ]
+    ],
+    [":test/schemas/api.test.ts", { "duration": 16088.2673, "failed": false }]
   ]
 }
