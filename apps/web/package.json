@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc --noEmit",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=200",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",

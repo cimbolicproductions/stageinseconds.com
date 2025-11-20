@@ -1,7 +1,8 @@
 # Deployment Guide
 
-**Last Updated**: 2025-11-09
-**Stack**: Vercel + Neon PostgreSQL
+**Last Updated**: 2025-11-19
+**Stack**: React Router 7 + Hono + Vercel + Neon PostgreSQL
+**Status**: All 8 production readiness tasks complete
 
 This guide provides step-by-step instructions for deploying stageinseconds.com to production.
 
@@ -194,13 +195,10 @@ Vercel should auto-detect React Router 7. Verify these settings in the dashboard
 
 **Build Command**:
 ```bash
-npm install && npm run build
+npm run build
 ```
 
-**Output Directory**:
-```bash
-build/client
-```
+**Output Directory**: (auto-detect or leave empty)
 
 **Install Command**:
 ```bash
@@ -208,6 +206,10 @@ npm install
 ```
 
 **Node Version**: `20.x` (latest LTS)
+
+**Note**: The project uses React Router 7 with Hono server. The build produces:
+- `build/client/` - Static assets (JS, CSS, images)
+- `build/server/` - SSR bundle for Vercel serverless functions
 
 ### Step 4: Set Environment Variables
 
@@ -218,17 +220,18 @@ Add all variables from [.env.example](./.env.example):
 | Variable | Value | Environment |
 |----------|-------|-------------|
 | `DATABASE_URL` | Neon **pooled** connection string | Production, Preview |
-| `AUTH_SECRET` | Generate: `openssl rand -hex 32` | Production, Preview |
+| `AUTH_SECRET` | Generate: `openssl rand -base64 32` | Production, Preview |
+| `AUTH_URL` | `https://stageinseconds.com` | Production |
 | `GOOGLE_API_KEY` | From https://aistudio.google.com/app/apikey | Production, Preview |
 | `STRIPE_SECRET_KEY` | `sk_live_...` (prod) or `sk_test_...` (dev) | Production |
 | `STRIPE_SECRET_KEY` | `sk_test_...` | Preview |
-| `STRIPE_PUBLIC_KEY` | `pk_live_...` or `pk_test_...` | Production |
-| `STRIPE_PUBLIC_KEY` | `pk_test_...` | Preview |
-| `NEXT_PUBLIC_CREATE_HOST` | `create.xyz` | Production, Preview |
-| `NEXT_PUBLIC_PROJECT_GROUP_ID` | Your project group ID | Production, Preview |
+| `STRIPE_PUBLISHABLE_KEY` | `pk_live_...` or `pk_test_...` | Production |
+| `STRIPE_PUBLISHABLE_KEY` | `pk_test_...` | Preview |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from Stripe webhook setup | Production |
+| `RESEND_API_KEY` | `re_...` from https://resend.com (optional) | Production |
+| `EMAIL_FROM` | `noreply@stageinseconds.com` (optional) | Production |
 | `NEXT_PUBLIC_APP_URL` | `https://stageinseconds.com` | Production |
 | `NODE_ENV` | `production` | Production |
-| `CORS_ORIGINS` | `https://stageinseconds.com` | Production |
 
 **Important**:
 - Select **"Production"** environment for production values

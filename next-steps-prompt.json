@@ -1,0 +1,350 @@
+{
+  "task": "Production Deployment and Final Verification",
+  "context": {
+    "project": "stageinseconds.com",
+    "status": "All 8 production readiness tasks complete",
+    "repository": "https://github.com/cimbolicproductions/stageinseconds.com",
+    "lastCommit": "05ce6d6 - Add request validation middleware using Zod schemas",
+    "currentState": {
+      "testsStatus": "82 unit tests passing",
+      "lintStatus": "130 warnings (0 errors) - acceptable for production",
+      "buildScript": "Missing - needs to be added",
+      "completedTasks": [
+        "Task 1: ESLint and Prettier with pre-commit hooks",
+        "Task 2: Database migrations (Drizzle ORM)",
+        "Task 3: Unit tests (82 passing)",
+        "Task 4: Integration tests (infrastructure + comprehensive API tests)",
+        "Task 5: CI/CD pipeline (GitHub Actions workflows ready)",
+        "Task 6: Error tracking and logging (Pino)",
+        "Task 7: Rate limiting (4 tiers with SSRF protection)",
+        "Task 8: Request validation (Zod schemas with type safety)"
+      ]
+    }
+  },
+  "immediateIssues": {
+    "critical": [
+      {
+        "issue": "Missing build script in package.json",
+        "impact": "Cannot deploy to production without build command",
+        "priority": "HIGH"
+      }
+    ],
+    "warnings": [
+      {
+        "issue": "130 ESLint warnings",
+        "impact": "Code quality concerns but not blocking",
+        "priority": "MEDIUM",
+        "note": "Most are unused variables, accessibility warnings, and React hooks warnings"
+      }
+    ]
+  },
+  "nextSteps": [
+    {
+      "step": 1,
+      "title": "Add Build Script",
+      "priority": "CRITICAL",
+      "estimatedTime": "5 minutes",
+      "description": "Add missing build script to package.json for production deployment",
+      "tasks": [
+        "Add 'build' script to apps/web/package.json",
+        "Use Next.js build command or appropriate build tool",
+        "Test build locally to ensure it works",
+        "Verify build output is correct"
+      ],
+      "expectedOutcome": "npm run build completes successfully"
+    },
+    {
+      "step": 2,
+      "title": "Production Environment Setup",
+      "priority": "CRITICAL",
+      "estimatedTime": "15-30 minutes",
+      "description": "Configure environment variables and prepare for Vercel deployment",
+      "tasks": [
+        "Create .env.example with all required variables",
+        "Document all environment variables in DEPLOYMENT.md",
+        "Set up Neon PostgreSQL database (if not already done)",
+        "Get API keys: GOOGLE_API_KEY, STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY",
+        "Get RESEND_API_KEY for email verification (optional but recommended)",
+        "Generate AUTH_SECRET using: openssl rand -base64 32"
+      ],
+      "requiredEnvVars": {
+        "critical": [
+          "DATABASE_URL - Neon PostgreSQL connection string",
+          "GOOGLE_API_KEY - For Gemini API photo processing",
+          "STRIPE_SECRET_KEY - For billing",
+          "STRIPE_PUBLISHABLE_KEY - For client-side Stripe",
+          "AUTH_SECRET - For authentication sessions",
+          "AUTH_URL - Production URL (e.g., https://stageinseconds.com)"
+        ],
+        "optional": [
+          "RESEND_API_KEY - For email verification",
+          "EMAIL_FROM - Sender email address",
+          "LOGTAIL_TOKEN - For centralized logging",
+          "RATE_LIMIT_ENABLED - Enable/disable rate limiting (default: true)",
+          "RATE_LIMIT_WINDOW - Rate limit window in ms (default: 60000)",
+          "RATE_LIMIT_AUTH_MAX - Auth endpoint limit (default: 5)",
+          "RATE_LIMIT_PHOTO_MAX - Photo endpoint limit (default: 10)",
+          "RATE_LIMIT_BILLING_MAX - Billing endpoint limit (default: 20)",
+          "RATE_LIMIT_GENERAL_MAX - General API limit (default: 100)"
+        ]
+      }
+    },
+    {
+      "step": 3,
+      "title": "Deploy to Vercel",
+      "priority": "HIGH",
+      "estimatedTime": "20-30 minutes",
+      "description": "Deploy application to Vercel for production hosting",
+      "tasks": [
+        "Go to vercel.com and sign in with GitHub",
+        "Click 'New Project'",
+        "Import repository: cimbolicproductions/stageinseconds.com",
+        "Configure project settings:",
+        "  - Framework Preset: Next.js (or detect automatically)",
+        "  - Root Directory: apps/web",
+        "  - Build Command: npm run build",
+        "  - Output Directory: .next (or auto-detect)",
+        "Add all environment variables from step 2",
+        "Click 'Deploy'",
+        "Wait for deployment to complete",
+        "Test production URL"
+      ],
+      "expectedOutcome": "Application deployed and accessible at Vercel URL"
+    },
+    {
+      "step": 4,
+      "title": "Database Migration in Production",
+      "priority": "HIGH",
+      "estimatedTime": "10 minutes",
+      "description": "Run database migrations on production database",
+      "tasks": [
+        "Ensure DATABASE_URL points to production Neon database",
+        "Run migrations: npm run db:migrate",
+        "Verify all tables created correctly",
+        "Test database connection from production app"
+      ],
+      "expectedOutcome": "All database tables exist and are accessible"
+    },
+    {
+      "step": 5,
+      "title": "Stripe Configuration",
+      "priority": "HIGH",
+      "estimatedTime": "20 minutes",
+      "description": "Configure Stripe for production billing",
+      "tasks": [
+        "Go to Stripe Dashboard",
+        "Create products with lookup keys:",
+        "  - credits_payg (pay-as-you-go)",
+        "  - credits_20 (20-pack)",
+        "  - credits_50 (50-pack)",
+        "  - credits_100 (100-pack)",
+        "Set metadata app='stageinseconds' on all prices (IMPORTANT for security)",
+        "Configure webhook endpoint:",
+        "  - URL: https://your-domain.com/api/billing/stripe-webhook",
+        "  - Events: checkout.session.completed",
+        "  - Get webhook secret and add to STRIPE_WEBHOOK_SECRET env var",
+        "Test checkout flow in production"
+      ],
+      "expectedOutcome": "Stripe checkout and webhooks working in production"
+    },
+    {
+      "step": 6,
+      "title": "Post-Deployment Verification",
+      "priority": "HIGH",
+      "estimatedTime": "30 minutes",
+      "description": "Verify all functionality works in production",
+      "checklist": [
+        {
+          "item": "Homepage loads correctly",
+          "test": "Visit production URL and verify content displays"
+        },
+        {
+          "item": "User signup works",
+          "test": "Create new account with email/password"
+        },
+        {
+          "item": "User signin works",
+          "test": "Sign in with test account"
+        },
+        {
+          "item": "Email verification sent (if configured)",
+          "test": "Check email for verification link"
+        },
+        {
+          "item": "Photo upload works",
+          "test": "Upload test photos on /upload page"
+        },
+        {
+          "item": "Photo processing works",
+          "test": "Process photos and verify ZIP download"
+        },
+        {
+          "item": "Stripe checkout works",
+          "test": "Initiate checkout (use test mode)"
+        },
+        {
+          "item": "Webhook processing works",
+          "test": "Complete test purchase and verify credits added"
+        },
+        {
+          "item": "Dashboard loads",
+          "test": "View user dashboard with jobs and credits"
+        },
+        {
+          "item": "Rate limiting works",
+          "test": "Make multiple rapid requests, verify 429 response"
+        },
+        {
+          "item": "Logging works",
+          "test": "Check Vercel logs for Pino JSON output"
+        },
+        {
+          "item": "Error handling works",
+          "test": "Trigger error, verify graceful handling and logging"
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "title": "Monitor and Optimize (Optional)",
+      "priority": "MEDIUM",
+      "estimatedTime": "1-2 hours",
+      "description": "Set up monitoring and address ESLint warnings",
+      "tasks": [
+        "Set up BetterStack/LogTail for log aggregation (free tier)",
+        "Configure Vercel Analytics",
+        "Set up UptimeRobot for uptime monitoring",
+        "Address critical ESLint warnings:",
+        "  - Fix unused variables by prefixing with underscore",
+        "  - Add aria labels for accessibility",
+        "  - Fix React hooks dependencies",
+        "Run npm audit and fix vulnerabilities",
+        "Run performance tests on production",
+        "Set up error alerting (email/Slack)"
+      ],
+      "expectedOutcome": "Production monitoring active, ESLint warnings reduced"
+    },
+    {
+      "step": 8,
+      "title": "Documentation Updates",
+      "priority": "LOW",
+      "estimatedTime": "30 minutes",
+      "description": "Update documentation with deployment info",
+      "tasks": [
+        "Update README.md with production URL",
+        "Add deployment date to implementation-tasks.json",
+        "Document production environment variables in DEPLOYMENT.md",
+        "Add troubleshooting section to DEPLOYMENT.md",
+        "Update API_DOCUMENTATION.md with production endpoints",
+        "Create CHANGELOG.md with version history"
+      ],
+      "expectedOutcome": "Complete documentation for deployed application"
+    }
+  ],
+  "troubleshooting": {
+    "commonIssues": [
+      {
+        "issue": "Build fails on Vercel",
+        "solutions": [
+          "Check build logs in Vercel dashboard",
+          "Verify all dependencies in package.json",
+          "Ensure Node.js version matches local development",
+          "Check for missing environment variables"
+        ]
+      },
+      {
+        "issue": "Database connection errors",
+        "solutions": [
+          "Verify DATABASE_URL is correct",
+          "Check Neon database is running and accessible",
+          "Ensure migrations have been run",
+          "Test connection string locally first"
+        ]
+      },
+      {
+        "issue": "Stripe webhooks not working",
+        "solutions": [
+          "Verify webhook endpoint URL is correct",
+          "Check STRIPE_WEBHOOK_SECRET is set",
+          "Review Stripe dashboard webhook logs",
+          "Ensure metadata app='stageinseconds' is set on prices"
+        ]
+      },
+      {
+        "issue": "Photos not processing",
+        "solutions": [
+          "Verify GOOGLE_API_KEY is valid",
+          "Check Gemini API quota and billing",
+          "Review server logs for API errors",
+          "Test API key with curl request"
+        ]
+      },
+      {
+        "issue": "Rate limiting too aggressive",
+        "solutions": [
+          "Adjust rate limit environment variables",
+          "Check logs for rate limit violations",
+          "Temporarily disable with RATE_LIMIT_ENABLED=false",
+          "Increase limits for specific tiers"
+        ]
+      }
+    ]
+  },
+  "successCriteria": {
+    "deployment": [
+      "Application accessible at production URL",
+      "All pages load without errors",
+      "Database connected and migrations complete",
+      "User signup/signin working",
+      "Photo processing functional",
+      "Stripe checkout and webhooks working",
+      "Logging active in production",
+      "Rate limiting protecting endpoints",
+      "No critical errors in logs"
+    ],
+    "quality": [
+      "Build completes successfully",
+      "All 82 unit tests passing",
+      "No ESLint errors (warnings acceptable)",
+      "Documentation up to date",
+      "Environment variables documented"
+    ]
+  },
+  "estimatedTimeline": {
+    "minimum": "1-2 hours for basic deployment",
+    "recommended": "3-4 hours including monitoring setup",
+    "comprehensive": "1 full day with ESLint fixes and optimization"
+  },
+  "notes": [
+    "The application is production-ready from a code quality standpoint",
+    "All security measures (rate limiting, SSRF protection, validation) are in place",
+    "The main blocker is the missing build script",
+    "130 ESLint warnings are non-critical and can be addressed over time",
+    "Focus on getting deployed first, then optimize iteratively",
+    "Vercel provides excellent defaults for Next.js apps",
+    "Free tier services (BetterStack, UptimeRobot) are sufficient for initial launch"
+  ],
+  "quickStart": {
+    "description": "Fastest path to deployment (30-45 minutes)",
+    "steps": [
+      "1. Add build script to package.json",
+      "2. Set up Neon database and get DATABASE_URL",
+      "3. Get GOOGLE_API_KEY from Google AI Studio",
+      "4. Get Stripe keys from Stripe Dashboard",
+      "5. Generate AUTH_SECRET: openssl rand -base64 32",
+      "6. Deploy to Vercel with all env vars",
+      "7. Run db:migrate on production database",
+      "8. Test core functionality (signup, photo processing, billing)",
+      "9. Monitor logs for errors",
+      "10. Celebrate! 🎉"
+    ]
+  },
+  "resources": {
+    "vercel": "https://vercel.com/docs/deployments/overview",
+    "neon": "https://neon.tech/docs/introduction",
+    "stripe": "https://stripe.com/docs/webhooks",
+    "googleAI": "https://ai.google.dev/gemini-api/docs/api-key",
+    "betterstack": "https://betterstack.com/logs",
+    "uptimeRobot": "https://uptimerobot.com/"
+  }
+}
