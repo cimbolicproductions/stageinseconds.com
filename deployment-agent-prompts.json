@@ -1,0 +1,236 @@
+{
+  "metadata": {
+    "project": "stageinseconds.com",
+    "createdAt": "2025-11-19",
+    "purpose": "Deployment automation prompts for browser agent and Claude Code",
+    "prerequisitesTasks": [
+      "All 8 production readiness tasks complete",
+      "Build script working",
+      "Environment variables documented"
+    ]
+  },
+  "browserAgentTasks": [
+    {
+      "taskId": "vercel-deployment",
+      "title": "Deploy to Vercel",
+      "priority": 1,
+      "estimatedTime": "15-20 minutes",
+      "prompt": "Deploy a React Router 7 application to Vercel. Follow these steps:\n\n1. Navigate to https://vercel.com and sign in with GitHub\n2. Click 'Add New...' then 'Project'\n3. Find and import the repository: cimbolicproductions/stageinseconds.com\n4. Configure the project:\n   - Framework Preset: Select 'Other' or 'Vite'\n   - Root Directory: Click 'Edit' and enter 'apps/web'\n   - Build Command: npm run build\n   - Output Directory: Leave as auto-detect or set to 'build/client'\n   - Install Command: npm install\n5. Add Environment Variables (click 'Environment Variables' to expand):\n   - DATABASE_URL: [User needs to provide from Neon dashboard]\n   - GOOGLE_API_KEY: [User needs to provide]\n   - STRIPE_SECRET_KEY: [User needs to provide - starts with sk_live_ or sk_test_]\n   - STRIPE_PUBLISHABLE_KEY: [User needs to provide - starts with pk_live_ or pk_test_]\n   - AUTH_SECRET: [User needs to provide - 32+ character random string]\n   - AUTH_URL: https://stageinseconds.com (or the Vercel domain)\n   - NODE_ENV: production\n6. Click 'Deploy'\n7. Wait for deployment to complete\n8. Copy the deployment URL for verification\n\nExpected outcome: Deployment successful with a .vercel.app URL or custom domain",
+      "requiredInputs": [
+        "DATABASE_URL",
+        "GOOGLE_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_PUBLISHABLE_KEY",
+        "AUTH_SECRET"
+      ],
+      "successIndicators": [
+        "Deployment status shows 'Ready'",
+        "Production URL is accessible",
+        "No build errors in deployment logs"
+      ]
+    },
+    {
+      "taskId": "stripe-products-setup",
+      "title": "Configure Stripe Products and Prices",
+      "priority": 2,
+      "estimatedTime": "15 minutes",
+      "prompt": "Set up Stripe products for the stageinseconds.com credit system. Follow these steps:\n\n1. Navigate to https://dashboard.stripe.com and sign in\n2. Go to 'Products' in the sidebar\n3. Click 'Add product' and create the following products:\n\n   Product 1 - Pay As You Go:\n   - Name: 'Pay As You Go Credit'\n   - Description: 'Single credit for one-time use'\n   - Price: $1.99 (one-time)\n   - Click 'Additional options' > 'Lookup key': credits_payg\n   - Add metadata: key='app', value='stageinseconds'\n\n   Product 2 - 20 Credit Pack:\n   - Name: '20 Credit Pack'\n   - Description: 'Bundle of 20 credits'\n   - Price: $29.99 (one-time)\n   - Lookup key: credits_20\n   - Add metadata: key='app', value='stageinseconds'\n\n   Product 3 - 50 Credit Pack:\n   - Name: '50 Credit Pack'\n   - Description: 'Bundle of 50 credits'\n   - Price: $59.99 (one-time)\n   - Lookup key: credits_50\n   - Add metadata: key='app', value='stageinseconds'\n\n   Product 4 - 100 Credit Pack:\n   - Name: '100 Credit Pack'\n   - Description: 'Bundle of 100 credits'\n   - Price: $99.99 (one-time)\n   - Lookup key: credits_100\n   - Add metadata: key='app', value='stageinseconds'\n\n4. Verify all products have the lookup keys and metadata set correctly\n\nIMPORTANT: The metadata app='stageinseconds' is critical for security - it prevents other Stripe accounts from triggering webhooks",
+      "requiredInputs": [],
+      "successIndicators": [
+        "4 products created with correct lookup keys",
+        "All prices have metadata app='stageinseconds'",
+        "Products visible in Stripe dashboard"
+      ]
+    },
+    {
+      "taskId": "stripe-webhook-setup",
+      "title": "Configure Stripe Webhook",
+      "priority": 3,
+      "estimatedTime": "10 minutes",
+      "prompt": "Set up a Stripe webhook endpoint for payment processing. Follow these steps:\n\n1. Navigate to https://dashboard.stripe.com/webhooks\n2. Click 'Add endpoint'\n3. Configure the webhook:\n   - Endpoint URL: https://[YOUR-VERCEL-DOMAIN]/api/billing/stripe-webhook\n     (Replace [YOUR-VERCEL-DOMAIN] with your actual Vercel deployment URL)\n   - Description: 'Stage In Seconds checkout webhook'\n4. Select events to listen to:\n   - Click 'Select events'\n   - Search for and select: checkout.session.completed\n   - You can also add: payment_intent.succeeded (optional)\n5. Click 'Add endpoint'\n6. After creation, click on the endpoint to view details\n7. Click 'Reveal' next to 'Signing secret'\n8. Copy the signing secret (starts with whsec_)\n9. Go back to Vercel dashboard > Your project > Settings > Environment Variables\n10. Add new variable:\n    - Name: STRIPE_WEBHOOK_SECRET\n    - Value: [paste the signing secret]\n11. Redeploy the project for the new variable to take effect\n\nExpected outcome: Webhook endpoint active and secret stored in Vercel",
+      "requiredInputs": [
+        "Vercel deployment URL"
+      ],
+      "successIndicators": [
+        "Webhook endpoint shows 'Active' status",
+        "STRIPE_WEBHOOK_SECRET added to Vercel",
+        "Test webhook shows successful delivery (optional)"
+      ]
+    },
+    {
+      "taskId": "post-deployment-verification",
+      "title": "Verify Production Deployment",
+      "priority": 4,
+      "estimatedTime": "20-30 minutes",
+      "prompt": "Perform comprehensive testing of the deployed application. Follow this checklist:\n\n1. Navigate to your production URL (Vercel deployment URL)\n\n2. Homepage Test:\n   - Verify homepage loads without errors\n   - Check that all images and styles load correctly\n   - Verify navigation works\n\n3. Authentication Test:\n   - Click Sign Up and create a test account\n   - Verify you receive verification email (if email is configured)\n   - Sign out and sign back in\n   - Verify session persists on page refresh\n\n4. Photo Processing Test:\n   - Navigate to /upload (or upload page)\n   - Upload 1-3 test photos\n   - Process the photos\n   - Verify ZIP file downloads correctly\n   - Check that credits are deducted\n\n5. Billing Test (use Stripe test mode):\n   - Navigate to billing/pricing page\n   - Initiate checkout for a credit pack\n   - Use Stripe test card: 4242 4242 4242 4242\n   - Any future expiry date, any CVC\n   - Complete purchase\n   - Verify credits are added to account\n\n6. Dashboard Test:\n   - Navigate to dashboard\n   - Verify credit balance displays\n   - Check job history shows\n\n7. Rate Limiting Test:\n   - Make 5+ rapid requests to same endpoint\n   - Verify 429 (Too Many Requests) response appears\n\n8. Error Handling Test:\n   - Try invalid operations\n   - Verify graceful error messages\n   - Check Vercel logs for proper logging\n\nReport any failures with specific details about what failed and any error messages shown.",
+      "requiredInputs": [
+        "Production URL"
+      ],
+      "successIndicators": [
+        "All pages load without errors",
+        "User can sign up and sign in",
+        "Photo processing works end-to-end",
+        "Stripe checkout completes successfully",
+        "Credits are properly tracked",
+        "Rate limiting is active"
+      ]
+    },
+    {
+      "taskId": "monitoring-setup",
+      "title": "Set Up Production Monitoring (Optional)",
+      "priority": 5,
+      "estimatedTime": "30 minutes",
+      "prompt": "Set up monitoring services for the production application:\n\n1. BetterStack/Logtail for Log Aggregation:\n   - Navigate to https://betterstack.com/logs\n   - Sign up for free tier\n   - Create a new source (Node.js)\n   - Copy the LOGTAIL_TOKEN\n   - Add to Vercel environment variables\n   - Redeploy\n\n2. Vercel Analytics:\n   - In Vercel dashboard, go to your project\n   - Click 'Analytics' tab\n   - Enable Web Analytics (free)\n   - Enable Speed Insights (optional)\n\n3. UptimeRobot for Uptime Monitoring:\n   - Navigate to https://uptimerobot.com\n   - Sign up for free account\n   - Click 'Add New Monitor'\n   - Monitor Type: HTTP(s)\n   - Friendly Name: Stage In Seconds\n   - URL: [Your production URL]\n   - Monitoring Interval: 5 minutes\n   - Create alert contacts for email notifications\n\nExpected outcome: Centralized logging, analytics, and uptime alerts configured",
+      "requiredInputs": [
+        "Production URL"
+      ],
+      "successIndicators": [
+        "Logs appearing in BetterStack",
+        "Vercel Analytics dashboard showing data",
+        "UptimeRobot showing 'Up' status"
+      ]
+    }
+  ],
+  "claudeCodeTasks": [
+    {
+      "taskId": "run-production-migrations",
+      "title": "Run Database Migrations on Production",
+      "priority": 1,
+      "estimatedTime": "5 minutes",
+      "prompt": "Run Drizzle ORM database migrations against the production Neon database for the stageinseconds.com project.\n\nContext:\n- Working directory: d:/GitHub/stageinseconds.com\n- The project uses Drizzle ORM with migrations in apps/web\n- Production DATABASE_URL should be set in environment\n\nTasks:\n1. Navigate to apps/web directory\n2. Ensure the DATABASE_URL environment variable points to the production Neon database\n3. Run the migration command: npm run db:migrate\n4. Verify migration completed successfully by checking the output\n5. Optionally run npm run db:push if needed to sync schema\n\nExpected outcome: All database tables created in production Neon database\n\nImportant: Make sure you're using the PRODUCTION DATABASE_URL, not development. The user should confirm which database URL to use before running migrations.",
+      "requiredInputs": [
+        "Production DATABASE_URL confirmation"
+      ],
+      "successIndicators": [
+        "Migration command completes without errors",
+        "All tables created successfully"
+      ]
+    },
+    {
+      "taskId": "fix-eslint-warnings",
+      "title": "Address Critical ESLint Warnings (Optional)",
+      "priority": 3,
+      "estimatedTime": "1-2 hours",
+      "prompt": "Address the 130 ESLint warnings in the stageinseconds.com project to improve code quality.\n\nContext:\n- Working directory: d:/GitHub/stageinseconds.com/apps/web\n- Currently 130 warnings, 0 errors\n- Most are unused variables, accessibility warnings, and React hooks dependencies\n\nTasks:\n1. Run npm run lint to see all warnings\n2. Focus on these categories:\n   - Unused variables: Prefix with underscore (e.g., _unused)\n   - Missing accessibility labels: Add aria-label attributes\n   - React hooks dependencies: Add missing dependencies or disable specific rules with comments\n3. Group fixes by file for efficient editing\n4. After each batch of fixes, run lint again to verify\n5. Commit changes with message: 'Fix ESLint warnings for improved code quality'\n\nPrioritization:\n- HIGH: Accessibility warnings (a11y)\n- MEDIUM: React hooks dependencies\n- LOW: Unused variables (quick fixes)\n\nExpected outcome: Reduced warning count, ideally below 50",
+      "requiredInputs": [],
+      "successIndicators": [
+        "ESLint warning count significantly reduced",
+        "No new errors introduced",
+        "All changes committed"
+      ]
+    },
+    {
+      "taskId": "update-documentation",
+      "title": "Update Documentation with Production Info",
+      "priority": 4,
+      "estimatedTime": "20 minutes",
+      "prompt": "Update project documentation with production deployment information for stageinseconds.com.\n\nContext:\n- Working directory: d:/GitHub/stageinseconds.com\n- Application has been deployed to Vercel\n- All production tasks are complete\n\nTasks:\n1. Update README.md:\n   - Add production URL\n   - Add deployment date\n   - Update any outdated information\n\n2. Update DEPLOYMENT.md:\n   - Add troubleshooting section if not present\n   - Document actual environment variables used\n   - Add production URLs and endpoints\n\n3. Create or update CHANGELOG.md:\n   - Document version 1.0.0\n   - List all features implemented\n   - Note deployment date\n\n4. Commit all documentation updates with message: 'Update documentation with production deployment info'\n\n5. Push changes to remote repository\n\nExpected outcome: Complete, up-to-date documentation reflecting production state",
+      "requiredInputs": [
+        "Production URL",
+        "Deployment date"
+      ],
+      "successIndicators": [
+        "README has production URL",
+        "DEPLOYMENT.md is comprehensive",
+        "CHANGELOG.md exists with version history",
+        "Changes pushed to GitHub"
+      ]
+    },
+    {
+      "taskId": "push-pending-commits",
+      "title": "Push Pending Commits to Remote",
+      "priority": 2,
+      "estimatedTime": "2 minutes",
+      "prompt": "Push pending local commits to the remote GitHub repository for stageinseconds.com.\n\nContext:\n- Working directory: d:/GitHub/stageinseconds.com\n- Branch is ahead of origin/main by 1 commit\n- Commit: f6dc4a9 - Add build script and deployment preparation\n\nTasks:\n1. Check git status to confirm pending commits\n2. Push to origin: git push origin main\n3. Verify push was successful\n\nExpected outcome: All local commits pushed to GitHub, CI/CD pipeline triggered",
+      "requiredInputs": [],
+      "successIndicators": [
+        "Push completes successfully",
+        "GitHub shows latest commits",
+        "CI/CD workflow runs (if configured)"
+      ]
+    }
+  ],
+  "executionOrder": {
+    "phase1_localPrep": [
+      "push-pending-commits"
+    ],
+    "phase2_deployment": [
+      "vercel-deployment"
+    ],
+    "phase3_database": [
+      "run-production-migrations"
+    ],
+    "phase4_stripe": [
+      "stripe-products-setup",
+      "stripe-webhook-setup"
+    ],
+    "phase5_verification": [
+      "post-deployment-verification"
+    ],
+    "phase6_optional": [
+      "monitoring-setup",
+      "fix-eslint-warnings",
+      "update-documentation"
+    ]
+  },
+  "requiredSecrets": {
+    "description": "These values must be provided by the user - never generate or guess them",
+    "secrets": [
+      {
+        "name": "DATABASE_URL",
+        "source": "Neon Dashboard (https://neon.tech/)",
+        "format": "postgresql://user:password@host.neon.tech/database?sslmode=require"
+      },
+      {
+        "name": "GOOGLE_API_KEY",
+        "source": "Google AI Studio (https://ai.google.dev/)",
+        "format": "AIza..."
+      },
+      {
+        "name": "STRIPE_SECRET_KEY",
+        "source": "Stripe Dashboard > API Keys",
+        "format": "sk_live_... or sk_test_..."
+      },
+      {
+        "name": "STRIPE_PUBLISHABLE_KEY",
+        "source": "Stripe Dashboard > API Keys",
+        "format": "pk_live_... or pk_test_..."
+      },
+      {
+        "name": "AUTH_SECRET",
+        "source": "Generate with: openssl rand -base64 32",
+        "format": "32+ character random string"
+      },
+      {
+        "name": "STRIPE_WEBHOOK_SECRET",
+        "source": "Stripe Dashboard > Webhooks > Signing secret",
+        "format": "whsec_..."
+      }
+    ]
+  },
+  "troubleshooting": {
+    "buildFailures": [
+      "Check Vercel build logs for specific errors",
+      "Verify all dependencies are in package.json",
+      "Ensure Root Directory is set to 'apps/web'",
+      "Check for missing environment variables"
+    ],
+    "databaseErrors": [
+      "Verify DATABASE_URL is correct and accessible",
+      "Check Neon database is not paused (free tier pauses after inactivity)",
+      "Ensure SSL mode is enabled in connection string",
+      "Run migrations if tables don't exist"
+    ],
+    "stripeIssues": [
+      "Verify API keys match environment (test vs live)",
+      "Check webhook endpoint URL is correct",
+      "Ensure STRIPE_WEBHOOK_SECRET is set",
+      "Verify metadata app='stageinseconds' on all prices"
+    ],
+    "authenticationProblems": [
+      "Check AUTH_SECRET is set and consistent",
+      "Verify AUTH_URL matches deployment URL",
+      "Clear browser cookies and try again"
+    ]
+  }
+}
